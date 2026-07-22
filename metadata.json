@@ -1,0 +1,6 @@
+{
+  "name": "Horological Precision",
+  "description": "Sistema de controle de estoque, vendas e análise financeira para relógios de luxo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
