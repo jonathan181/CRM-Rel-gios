@@ -58,6 +58,12 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [purchaseDate, setPurchaseDate] = useState<string>(
     initialWatch?.purchaseDate || new Date().toISOString().split('T')[0]
   );
+  const [shipmentDateBrazil, setShipmentDateBrazil] = useState<string>(
+    initialWatch?.shipmentDateBrazil || ''
+  );
+  const [arrivalDateBrazil, setArrivalDateBrazil] = useState<string>(
+    initialWatch?.arrivalDateBrazil || ''
+  );
 
   // Currency & Financial calculation
   const [purchaseCurrency, setPurchaseCurrency] = useState<CurrencyCode>(
@@ -89,7 +95,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [imageUrls, setImageUrls] = useState<string[]>(
     initialWatch?.images && initialWatch.images.length > 0
       ? initialWatch.images
-      : ['https://images.unsplash.com/photo-1612817159949-195b6eb9e31a?q=80&w=1200']
+      : []
   );
   const [newImageUrl, setNewImageUrl] = useState<string>('');
   const [showPresetsModal, setShowPresetsModal] = useState<boolean>(false);
@@ -194,10 +200,6 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       alert('Por favor, informe o modelo / referência.');
       return;
     }
-    if (imageUrls.length === 0) {
-      alert('Adicione pelo menos um link direto de imagem ou faça o upload de uma foto.');
-      return;
-    }
 
     const finalBrand = brand;
     const finalModel = model.trim();
@@ -227,6 +229,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       serialNumber: serialNumber.trim(),
       condition,
       purchaseDate,
+      shipmentDateBrazil: shipmentDateBrazil || undefined,
+      arrivalDateBrazil: arrivalDateBrazil || undefined,
       purchaseCurrency,
       purchasePrice,
       freightCost,
@@ -331,17 +335,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Informações Adicionais */}
+            {/* Detalhes Adicionais */}
             <div>
               <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
-                Informações Adicionais
+                Detalhes Adicionais
               </label>
               <input
                 type="text"
-                placeholder="ex: R789234X"
+                placeholder="ex: R789234X, mostrador azul, etc."
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
+                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none placeholder:text-[#9b8f79]/50"
               />
             </div>
 
@@ -374,6 +378,34 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 required
                 value={purchaseDate}
                 onChange={(e) => setPurchaseDate(e.target.value)}
+                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#27272a]/40">
+            {/* Data de envio para Brasil */}
+            <div>
+              <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
+                Data de envio para Brasil
+              </label>
+              <input
+                type="date"
+                value={shipmentDateBrazil}
+                onChange={(e) => setShipmentDateBrazil(e.target.value)}
+                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none"
+              />
+            </div>
+
+            {/* Data de chegada no Brasil */}
+            <div>
+              <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
+                Data de chegada no Brasil
+              </label>
+              <input
+                type="date"
+                value={arrivalDateBrazil}
+                onChange={(e) => setArrivalDateBrazil(e.target.value)}
                 className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none"
               />
             </div>
@@ -508,10 +540,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               />
             </div>
 
-            {/* Notas & Especificações */}
+            {/* Informações Adicionais / Notas */}
             <div>
               <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
-                Notas & Especificações
+                Informações Adicionais / Especificações
               </label>
               <input
                 type="text"
@@ -624,8 +656,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             </div>
           </div>
 
-          {/* Current Images List */}
-          {imageUrls.length > 0 && (
+          {/* Current Images List or Empty State */}
+          {imageUrls.length > 0 ? (
             <div className="space-y-2 pt-2">
               <p className="text-xs font-semibold text-[#e5e1e4]">
                 Fotos Adicionadas ({imageUrls.length}):
@@ -641,8 +673,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                       alt={`Relógio ${index + 1}`}
                       className="w-full h-full object-cover"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=400';
+                        (e.target as HTMLImageElement).src = '/no-image.svg';
                       }}
                     />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
@@ -662,6 +693,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     )}
                   </div>
                 ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4 p-4 bg-[#131315] rounded-xl border border-[#27272a]">
+              <img
+                src="/no-image.svg"
+                alt="Sem imagem"
+                className="w-16 h-16 rounded-lg object-cover border border-[#27272a] flex-shrink-0"
+              />
+              <div className="text-xs space-y-1">
+                <p className="font-semibold text-[#e5e1e4]">
+                  Nenhuma foto adicionada ainda
+                </p>
+                <p className="text-[#9b8f79]">
+                  Você pode adicionar sua própria foto acima. Se não enviar nenhuma imagem, o relógio será exibido no estoque com a imagem padrão de exemplo ao lado.
+                </p>
               </div>
             </div>
           )}

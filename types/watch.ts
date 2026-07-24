@@ -20,6 +20,8 @@ export interface Watch {
   serialNumber?: string;
   condition: string; // e.g., 'Novo', '100% Mint', '95%', '60%', '50%-'
   purchaseDate: string; // YYYY-MM-DD
+  shipmentDateBrazil?: string; // YYYY-MM-DD (optional)
+  arrivalDateBrazil?: string; // YYYY-MM-DD (optional)
   
   // Purchase Costs & Currency conversion
   purchaseCurrency: CurrencyCode;

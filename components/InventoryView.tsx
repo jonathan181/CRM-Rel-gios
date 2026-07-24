@@ -283,8 +283,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             const isConsignment = watch.status === 'Consignação';
 
             const primaryImage =
-              watch.images[0] ||
-              'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200';
+              (watch.images && watch.images.length > 0 && watch.images[0]) ||
+              '/no-image.svg';
 
             const netProfit = isSold && watch.sale
               ? watch.sale.salePriceBrl - watch.totalCostBrl - watch.sale.shippingAndFeesBrl
@@ -305,8 +305,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       alt={watch.model}
                       className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                       onError={(e) => {
-                        (e.target as HTMLImageElement).src =
-                          'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200';
+                        (e.target as HTMLImageElement).src = '/no-image.svg';
                       }}
                     />
 
@@ -351,7 +350,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       <h3 className="font-bold text-lg text-[#e5e1e4] leading-tight mt-0.5 line-clamp-2">
                         {watch.model}
                       </h3>
-                      <p className="text-xs font-mono text-[#9b8f79] mt-0.5">Ref. {watch.ref}</p>
+                      {watch.ref && watch.ref.trim().toUpperCase() !== 'N/A' && watch.ref.trim() !== '' && watch.ref.trim() !== '-' && (
+                        <p className="text-xs font-mono text-[#9b8f79] mt-0.5">Ref. {watch.ref}</p>
+                      )}
+
+                      {(watch.serialNumber || watch.notesAndSpecs) && (
+                        <p className="text-xs text-[#9b8f79] mt-1 line-clamp-2">
+                          {[watch.serialNumber, watch.notesAndSpecs].filter(Boolean).join(' • ')}
+                        </p>
+                      )}
                     </div>
 
                     {/* Pricing grid */}
@@ -459,9 +466,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                     <tr key={watch.id} className="hover:bg-[#201f22]/60 transition-colors">
                       <td className="p-4 flex items-center gap-3">
                         <img
-                          src={watch.images[0] || 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=200'}
+                          src={(watch.images && watch.images.length > 0 && watch.images[0]) || '/no-image.svg'}
                           alt={watch.model}
                           className="w-10 h-10 rounded-lg object-cover border border-[#27272a]"
+                          onError={(e) => {
+                            (e.target as HTMLImageElement).src = '/no-image.svg';
+                          }}
                         />
                         <div className="font-bold text-sm truncate max-w-[200px]">
                           {watch.model}
@@ -469,7 +479,14 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                       </td>
                       <td className="p-4">
                         <span className="font-bold text-[#ffd165] block">{watch.brand}</span>
-                        <span className="text-[#9b8f79] font-mono text-[11px]">Ref: {watch.ref}</span>
+                        {watch.ref && watch.ref.trim().toUpperCase() !== 'N/A' && watch.ref.trim() !== '' && watch.ref.trim() !== '-' && (
+                          <span className="text-[#9b8f79] font-mono text-[11px] block">Ref: {watch.ref}</span>
+                        )}
+                        {(watch.serialNumber || watch.notesAndSpecs) && (
+                          <span className="text-[#9b8f79]/80 text-[10px] block truncate max-w-[180px]" title={watch.serialNumber || watch.notesAndSpecs}>
+                            {watch.serialNumber || watch.notesAndSpecs}
+                          </span>
+                        )}
                       </td>
                       <td className="p-4">
                         <span

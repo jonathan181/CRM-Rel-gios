@@ -29,7 +29,15 @@ export async function POST(req: NextRequest) {
     // 2. Validate password
     let isPasswordValid = false;
     if (dbUser.password) {
-      isPasswordValid = await bcrypt.compare(password, dbUser.password);
+      if (
+        dbUser.password.startsWith('$2a$') ||
+        dbUser.password.startsWith('$2b$') ||
+        dbUser.password.startsWith('$2y$')
+      ) {
+        isPasswordValid = await bcrypt.compare(password, dbUser.password);
+      } else {
+        isPasswordValid = password === dbUser.password;
+      }
     }
 
     if (!isPasswordValid) {

@@ -33,7 +33,7 @@ export async function verifyAnyAuthToken(token: string): Promise<AuthenticatedUs
   if (customDecoded) {
     const dbUser = await getOrCreateUser(customDecoded.uid, customDecoded.email, customDecoded.name || '');
     return {
-      uid: customDecoded.uid,
+      uid: dbUser?.uid || customDecoded.uid,
       email: customDecoded.email,
       name: customDecoded.name,
       dbUser,
@@ -45,7 +45,7 @@ export async function verifyAnyAuthToken(token: string): Promise<AuthenticatedUs
     const decoded = await adminAuth.verifyIdToken(token);
     const dbUser = await getOrCreateUser(decoded.uid, decoded.email || '', decoded.name || '');
     return {
-      uid: decoded.uid,
+      uid: dbUser?.uid || decoded.uid,
       email: decoded.email || '',
       name: decoded.name,
       dbUser,

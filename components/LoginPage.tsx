@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useAuth } from './AuthProvider';
-import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, ArrowRight } from 'lucide-react';
+import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
 
 interface LoginPageProps {
   onSuccess?: () => void;
@@ -11,24 +11,26 @@ interface LoginPageProps {
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
   const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
+  const [mode, setMode] = useState<'login' | 'register' | 'reset'>('login');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setSuccessMsg(null);
 
     if (mode === 'register' && !name.trim()) {
       setError('Por favor, informe seu nome completo.');
       return;
     }
     if (!email.trim() || !password.trim()) {
-      setError('Por favor, preencha email e senha.');
+      setError('Por favor, preencha e-mail e senha.');
       return;
     }
     if (password.length < 6) {
@@ -41,23 +43,34 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
     try {
       if (mode === 'register') {
         await signUpWithEmail(name.trim(), email.trim(), password);
-      } else {
+        if (onSuccess) onSuccess();
+      } else if (mode === 'login') {
         await signInWithEmail(email.trim(), password);
+        if (onSuccess) onSuccess();
+      } else if (mode === 'reset') {
+        const res = await fetch('/api/auth/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email.trim(), newPassword: password }),
+        });
+        const data = await res.json();
+        if (!res.ok || data.error) {
+          throw new Error(data.error || 'Erro ao redefinir a senha.');
+        }
+        setSuccessMsg('Senha redefinida com sucesso! Informe sua nova senha para entrar.');
+        setMode('login');
       }
-      if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Erro de autenticação:', err);
       let message = 'Ocorreu um erro ao processar sua solicitação.';
       if (err.code === 'auth/operation-not-allowed') {
-        message = 'O login por E-mail/Senha não está ativado no Firebase Console. Por favor, utilize o botão "Continuar com conta Google" para entrar instantaneamente.';
+        message = 'O login por E-mail/Senha não está ativado no Firebase Console. Utilize o botão Google para entrar.';
       } else if (err.code === 'auth/email-already-in-use') {
         message = 'Este e-mail já está cadastrado. Tente fazer login.';
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        message = 'E-mail ou senha incorretos.';
+        message = 'Senha incorreta. Tente novamente ou redefina sua senha.';
       } else if (err.code === 'auth/user-not-found') {
-        message = 'Usuário não encontrado. Verifique seu e-mail ou cadastre-se.';
-      } else if (err.code === 'auth/invalid-email') {
-        message = 'Formato de e-mail inválido.';
+        message = 'Usuário não encontrado. Verifique seu e-mail ou crie uma conta.';
       } else if (err.message) {
         message = err.message;
       }
@@ -69,6 +82,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    setSuccessMsg(null);
     setLoading(true);
     try {
       await signInWithGoogle();
@@ -105,14 +119,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         <div className="bg-[#1a1a1c] border border-[#27272a] rounded-xl p-3 flex items-center justify-between text-xs">
           <div className="flex items-center gap-2">
             <Database className="w-4 h-4 text-[#4edea3]" />
-            <span className="text-[#e5e1e4] font-medium">Banco PostgreSQL (Cloud SQL)</span>
+            <span className="text-[#e5e1e4] font-medium">Banco Supabase (PostgreSQL)</span>
           </div>
           <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4edea3] bg-[#4edea3]/10 px-2 py-0.5 rounded-full border border-[#4edea3]/20">
             <ShieldCheck className="w-3 h-3" /> Conectado
           </span>
         </div>
 
-        {/* Google OAuth Button - Recommended */}
+        {/* Google OAuth Button */}
         <button
           type="button"
           onClick={handleGoogleSignIn}
@@ -154,6 +168,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             onClick={() => {
               setMode('login');
               setError(null);
+              setSuccessMsg(null);
             }}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
               mode === 'login'
@@ -169,6 +184,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             onClick={() => {
               setMode('register');
               setError(null);
+              setSuccessMsg(null);
             }}
             className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
               mode === 'register'
@@ -181,16 +197,45 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           </button>
         </div>
 
+        {/* Alert Success Box */}
+        {successMsg && (
+          <div className="bg-[#4edea3]/10 border border-[#4edea3]/30 rounded-xl p-3 text-xs text-[#4edea3] flex items-start gap-2 animate-fadeIn">
+            <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+            <span>{successMsg}</span>
+          </div>
+        )}
+
         {/* Alert Error Box */}
         {error && (
-          <div className="bg-[#e51c44]/10 border border-[#e51c44]/30 rounded-xl p-3 text-xs text-[#e51c44] flex items-start gap-2 animate-fadeIn">
-            <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{error}</span>
+          <div className="bg-[#e51c44]/10 border border-[#e51c44]/30 rounded-xl p-3 text-xs text-[#e51c44] flex flex-col gap-2 animate-fadeIn">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+              <span>{error}</span>
+            </div>
+            {error.includes('Senha incorreta') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMode('reset');
+                  setError(null);
+                }}
+                className="text-left text-[11px] underline font-medium text-[#ffd165] hover:text-[#e5bc53] transition-colors ml-6"
+              >
+                Esqueceu sua senha? Clique aqui para criar uma nova senha agora.
+              </button>
+            )}
           </div>
         )}
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === 'reset' && (
+            <div className="p-3 bg-[#ffd165]/10 border border-[#ffd165]/20 rounded-xl text-xs text-[#ffd165] flex items-center gap-2">
+              <KeyRound className="w-4 h-4 flex-shrink-0" />
+              <span>Digite seu e-mail e escolha sua nova senha abaixo.</span>
+            </div>
+          )}
+
           {/* Name Field (Cadastro) */}
           {mode === 'register' && (
             <div className="space-y-1.5">
@@ -227,13 +272,30 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
           {/* Password Field */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-[#9b8f79]">Senha</label>
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-[#9b8f79]">
+                {mode === 'reset' ? 'Nova Senha' : 'Senha'}
+              </label>
+              {mode === 'login' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('reset');
+                    setError(null);
+                    setSuccessMsg(null);
+                  }}
+                  className="text-[11px] text-[#9b8f79] hover:text-[#ffd165] transition-colors"
+                >
+                  Esqueceu a senha?
+                </button>
+              )}
+            </div>
             <div className="relative">
               <Lock className="w-4 h-4 text-[#9b8f79] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="password"
                 required
-                placeholder="Sua senha secreta"
+                placeholder={mode === 'reset' ? 'Digite a nova senha' : 'Sua senha secreta'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 bg-[#1a1a1c] border border-[#27272a] rounded-xl text-xs text-[#e5e1e4] focus:outline-none focus:border-[#ffd165] transition-colors placeholder-[#9b8f79]/50"
@@ -253,6 +315,11 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               <>
                 <UserPlus className="w-4 h-4" />
                 <span>Cadastrar e Entrar</span>
+              </>
+            ) : mode === 'reset' ? (
+              <>
+                <KeyRound className="w-4 h-4" />
+                <span>Redefinir e Salvar Senha</span>
               </>
             ) : (
               <>

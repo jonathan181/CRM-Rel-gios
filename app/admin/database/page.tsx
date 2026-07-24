@@ -69,7 +69,7 @@ export default function DatabaseViewerPage() {
           <Database className="w-12 h-12 text-[#ffd165] mx-auto mb-4" />
           <h1 className="text-xl font-bold mb-2">Acesso Restrito ao Banco de Dados</h1>
           <p className="text-[#9b8f79] text-sm mb-6">
-            Por favor, faça login na aplicação para visualizar os registros do banco de dados Cloud SQL.
+            Por favor, faça login na aplicação para visualizar os registros do banco de dados Supabase (PostgreSQL).
           </p>
           <Link
             href="/"
@@ -112,7 +112,7 @@ export default function DatabaseViewerPage() {
               <div className="flex items-center gap-2">
                 <h1 className="text-xl font-bold tracking-tight">Gerenciador de Banco de Dados</h1>
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-[#22c55e]/10 text-[#22c55e] border border-[#22c55e]/20 flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3" /> Cloud SQL (PostgreSQL)
+                  <ShieldCheck className="w-3 h-3" /> Supabase (PostgreSQL)
                 </span>
               </div>
               <p className="text-xs text-[#9b8f79] mt-0.5">
@@ -164,7 +164,7 @@ export default function DatabaseViewerPage() {
           <div className="bg-[#18171b] border border-[#27272a] rounded-xl p-5 flex items-center justify-between">
             <div>
               <p className="text-xs font-medium text-[#9b8f79]">Motor de Banco de Dados</p>
-              <p className="text-sm font-semibold text-[#22c55e] mt-1">GCP Cloud SQL (PostgreSQL)</p>
+              <p className="text-sm font-semibold text-[#22c55e] mt-1">Supabase (PostgreSQL)</p>
             </div>
             <div className="w-10 h-10 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center">
               <HardDrive className="w-5 h-5" />

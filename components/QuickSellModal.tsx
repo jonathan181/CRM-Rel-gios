@@ -79,9 +79,12 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
           {/* Watch Summary Card */}
           <div className="flex items-center gap-3 p-3 bg-[#131315] rounded-xl border border-[#27272a]">
             <img
-              src={watch.images[0] || 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=400'}
+              src={(watch.images && watch.images.length > 0 && watch.images[0]) || '/no-image.svg'}
               alt={watch.model}
               className="w-12 h-12 rounded-lg object-cover border border-[#27272a]"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = '/no-image.svg';
+              }}
             />
             <div className="flex-1 min-w-0">
               <p className="text-xs text-[#ffd165] font-bold">{watch.brand}</p>

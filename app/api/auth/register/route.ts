@@ -49,13 +49,13 @@ export async function POST(req: NextRequest) {
     );
 
     // Generate JWT token
-    const token = signAppToken({ uid, email: cleanEmail, name: cleanName });
+    const token = signAppToken({ uid: dbUser.uid || uid, email: cleanEmail, name: cleanName });
 
     return NextResponse.json({
       success: true,
       token,
       user: {
-        uid,
+        uid: dbUser.uid || uid,
         email: cleanEmail,
         displayName: cleanName,
         dbId: dbUser.id,

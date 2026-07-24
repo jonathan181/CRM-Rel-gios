@@ -27,7 +27,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
 
   if (!watch) return null;
 
-  const activeImage = watch.images[activeImageIndex] || watch.images[0] || 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200';
+  const activeImage = (watch.images && watch.images.length > 0 && (watch.images[activeImageIndex] || watch.images[0])) || '/no-image.svg';
 
   const isSold = watch.status === 'Vendido';
   const isConsignment = watch.status === 'Consignação';
@@ -119,7 +119,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                   alt={`${watch.brand} ${watch.model}`}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).src = 'https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?q=80&w=1200';
+                    (e.target as HTMLImageElement).src = '/no-image.svg';
                   }}
                 />
 
@@ -177,7 +177,9 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                 <h3 className="text-2xl font-bold text-[#e5e1e4] leading-tight">
                   {watch.model}
                 </h3>
-                <p className="text-sm font-mono text-[#9b8f79] mt-1">Ref. {watch.ref}</p>
+                {watch.ref && watch.ref.trim().toUpperCase() !== 'N/A' && watch.ref.trim() !== '' && watch.ref.trim() !== '-' && (
+                  <p className="text-sm font-mono text-[#9b8f79] mt-1">Ref. {watch.ref}</p>
+                )}
               </div>
 
               {/* Badges / Quick attributes */}
@@ -187,9 +189,9 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                   <p className="text-sm font-semibold text-[#e5e1e4]">{watch.condition}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-[#9b8f79]">Informações Adicionais</p>
-                  <p className="text-sm font-mono font-semibold text-[#e5e1e4] truncate">
-                    {watch.serialNumber || 'N/A'}
+                  <p className="text-xs text-[#9b8f79]">Detalhes Adicionais</p>
+                  <p className="text-sm font-semibold text-[#e5e1e4] truncate" title={watch.serialNumber || watch.notesAndSpecs || 'N/A'}>
+                    {watch.serialNumber || watch.notesAndSpecs || 'N/A'}
                   </p>
                 </div>
                 <div>
@@ -204,6 +206,22 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                     {watch.supplier || 'Não informado'}
                   </p>
                 </div>
+                {watch.shipmentDateBrazil && (
+                  <div>
+                    <p className="text-xs text-[#9b8f79]">Envio p/ Brasil</p>
+                    <p className="text-sm font-semibold text-[#e5e1e4]">
+                      {formatDatePtBr(watch.shipmentDateBrazil)}
+                    </p>
+                  </div>
+                )}
+                {watch.arrivalDateBrazil && (
+                  <div>
+                    <p className="text-xs text-[#9b8f79]">Chegada no Brasil</p>
+                    <p className="text-sm font-semibold text-[#e5e1e4]">
+                      {formatDatePtBr(watch.arrivalDateBrazil)}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Financial Box */}

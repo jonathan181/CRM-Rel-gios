@@ -21,6 +21,8 @@ export const watches = pgTable('watches', {
   serialNumber: text('serial_number'),
   condition: text('condition').notNull(),
   purchaseDate: text('purchase_date').notNull(),
+  shipmentDateBrazil: text('shipment_date_brazil'),
+  arrivalDateBrazil: text('arrival_date_brazil'),
   purchaseCurrency: text('purchase_currency').notNull(),
   purchasePrice: doublePrecision('purchase_price').notNull(),
   freightCost: doublePrecision('freight_cost').notNull(),
