@@ -3,7 +3,8 @@
 import React, { useState } from 'react';
 import { safeFetchJson } from '@/lib/api';
 import { useAuth } from './AuthProvider';
-import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, CheckCircle, KeyRound, Sparkles } from 'lucide-react';
+import { ErrorDetailsModal, ErrorDetailsInfo } from './ErrorDetailsModal';
+import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, CheckCircle, KeyRound, Sparkles, Terminal } from 'lucide-react';
 
 interface LoginPageProps {
   onSuccess?: () => void;
@@ -19,11 +20,14 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorInfo, setErrorInfo] = useState<ErrorDetailsInfo | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
+    setErrorInfo(null);
     setSuccessMsg(null);
 
     if (mode === 'register' && !name.trim()) {
@@ -76,6 +80,15 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
         message = err.message;
       }
       setError(message);
+      setErrorInfo({
+        message,
+        status: err.status,
+        statusText: err.statusText,
+        url: err.url || (mode === 'reset' ? '/api/auth/reset-password' : mode === 'register' ? '/api/auth/register' : '/api/auth/login'),
+        bodyText: err.bodyText || err.stack || JSON.stringify(err, Object.getOwnPropertyNames(err), 2),
+        timestamp: err.timestamp || new Date().toLocaleString('pt-BR'),
+        rawError: err,
+      });
     } finally {
       setLoading(false);
     }
@@ -83,6 +96,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   const handleGoogleSignIn = async () => {
     setError(null);
+    setErrorInfo(null);
     setSuccessMsg(null);
     setLoading(true);
     try {
@@ -90,7 +104,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Erro no login Google:', err);
-      setError('Não foi possível entrar com a conta Google. Tente novamente ou use o Modo Demonstração.');
+      const message = 'Não foi possível entrar com a conta Google. Tente novamente ou use o Modo Demonstração.';
+      setError(message);
+      setErrorInfo({
+        message,
+        status: err.status,
+        statusText: err.statusText,
+        url: 'Google OAuth / Firebase Auth',
+        bodyText: err.bodyText || err.message || JSON.stringify(err),
+        timestamp: new Date().toLocaleString('pt-BR'),
+      });
     } finally {
       setLoading(false);
     }
@@ -98,6 +121,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
   const handleDemoSignIn = async () => {
     setError(null);
+    setErrorInfo(null);
     setSuccessMsg(null);
     setLoading(true);
     try {
@@ -105,7 +129,16 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Erro no modo demonstração:', err);
-      setError('Erro ao iniciar modo demonstração.');
+      const message = 'Erro ao iniciar modo demonstração.';
+      setError(message);
+      setErrorInfo({
+        message,
+        status: err.status,
+        statusText: err.statusText,
+        url: 'Demo Auth',
+        bodyText: err.bodyText || err.message || JSON.stringify(err),
+        timestamp: new Date().toLocaleString('pt-BR'),
+      });
     } finally {
       setLoading(false);
     }
@@ -234,23 +267,37 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
 
         {/* Alert Error Box */}
         {error && (
-          <div className="bg-[#e51c44]/10 border border-[#e51c44]/30 rounded-xl p-3 text-xs text-[#e51c44] flex flex-col gap-2 animate-fadeIn">
+          <div className="bg-[#e51c44]/10 border border-[#e51c44]/30 rounded-xl p-3.5 text-xs text-[#e51c44] flex flex-col gap-2.5 animate-fadeIn">
             <div className="flex items-start gap-2">
               <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-              <span>{error}</span>
+              <div className="flex-1">
+                <span className="font-semibold">{error}</span>
+              </div>
             </div>
-            {error.includes('Senha incorreta') && (
+
+            <div className="flex items-center justify-between pt-1 border-t border-[#e51c44]/20 text-[11px]">
+              {error.includes('Senha incorreta') ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode('reset');
+                    setError(null);
+                  }}
+                  className="text-left underline font-medium text-[#ffd165] hover:text-[#e5bc53] transition-colors"
+                >
+                  Esqueceu sua senha? Clique para redefinir.
+                </button>
+              ) : <span />}
+
               <button
                 type="button"
-                onClick={() => {
-                  setMode('reset');
-                  setError(null);
-                }}
-                className="text-left text-[11px] underline font-medium text-[#ffd165] hover:text-[#e5bc53] transition-colors ml-6"
+                onClick={() => setIsModalOpen(true)}
+                className="ml-auto inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#e51c44]/20 hover:bg-[#e51c44]/30 text-[#e5e1e4] font-bold rounded-lg border border-[#e51c44]/40 transition-all cursor-pointer"
               >
-                Esqueceu sua senha? Clique aqui para criar uma nova senha agora.
+                <Terminal className="w-3.5 h-3.5 text-[#ffd165]" />
+                <span>Ver Detalhes do Erro</span>
               </button>
-            )}
+            </div>
           </div>
         )}
 
@@ -357,6 +404,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           </button>
         </form>
       </div>
+
+      {/* Detailed Technical Error Modal */}
+      <ErrorDetailsModal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        errorInfo={errorInfo}
+      />
     </div>
   );
 };

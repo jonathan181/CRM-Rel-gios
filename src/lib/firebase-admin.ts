@@ -2,10 +2,18 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
 
-if (!getApps().length) {
-  initializeApp({
-    projectId: firebaseConfig.projectId,
-  });
+let adminAuthInstance: any = null;
+
+try {
+  if (!getApps().length) {
+    initializeApp({
+      projectId: firebaseConfig?.projectId || 'tuned-envoy-28gvj',
+    });
+  }
+  adminAuthInstance = getAuth();
+} catch (e) {
+  console.warn('Firebase Admin SDK safe initialization warning:', e);
 }
 
-export const adminAuth = getAuth();
+export const adminAuth = adminAuthInstance;
+

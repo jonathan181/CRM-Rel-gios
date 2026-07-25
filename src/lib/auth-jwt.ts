@@ -55,7 +55,7 @@ export async function verifyAnyAuthToken(token: string): Promise<AuthenticatedUs
 
   // 2. Try Firebase ID Token verification (for Google Sign-In)
   const parts = token.split('.');
-  if (parts.length === 3) {
+  if (parts.length === 3 && adminAuth && typeof adminAuth.verifyIdToken === 'function') {
     try {
       const decoded = await adminAuth.verifyIdToken(token);
       if (decoded && decoded.uid) {

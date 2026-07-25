@@ -20,9 +20,11 @@ export function getSupabaseCredentials() {
 
   const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || '';
   if (!rawUrl && dbUrl) {
-    const match = dbUrl.match(/@db\.([a-z0-9-]+)\.supabase\.co/i);
-    if (match && match[1]) {
-      rawUrl = `https://${match[1]}.supabase.co`;
+    const directMatch = dbUrl.match(/@db\.([a-z0-9-]+)\.supabase\.co/i);
+    const poolerMatch = dbUrl.match(/postgres\.([a-z0-9-]+):/i);
+    const ref = directMatch?.[1] || poolerMatch?.[1];
+    if (ref) {
+      rawUrl = `https://${ref}.supabase.co`;
     }
   }
 
