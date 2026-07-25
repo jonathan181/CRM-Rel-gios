@@ -4,6 +4,8 @@ import crypto from 'crypto';
 import { getOrCreateUser, getUserByEmail } from '@/src/db/users';
 import { signAppToken } from '@/src/lib/auth-jwt';
 
+export const dynamic = 'force-dynamic';
+
 export async function POST(req: NextRequest) {
   try {
     const { name, email, password } = await req.json();

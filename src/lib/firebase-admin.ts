@@ -1,13 +1,23 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import firebaseConfig from '../../firebase-applet-config.json';
 
 let adminAuthInstance: any = null;
 
 try {
+  let projectId = 'tuned-envoy-28gvj';
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const firebaseConfig = require('../../firebase-applet-config.json');
+    if (firebaseConfig?.projectId) {
+      projectId = firebaseConfig.projectId;
+    }
+  } catch {
+    // Ignore if JSON file is missing during Vercel build/runtime
+  }
+
   if (!getApps().length) {
     initializeApp({
-      projectId: firebaseConfig?.projectId || 'tuned-envoy-28gvj',
+      projectId,
     });
   }
   adminAuthInstance = getAuth();

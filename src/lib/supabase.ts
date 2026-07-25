@@ -45,24 +45,33 @@ export function getSupabaseClient(): SupabaseClient | null {
   const { url, key } = getSupabaseCredentials();
   if (!url || !key) return null;
 
-  if (!supabaseClientInstance) {
-    supabaseClientInstance = createClient(url, key, {
-      auth: {
-        persistSession: false,
-        autoRefreshToken: false,
-      },
-    });
+  try {
+    if (!supabaseClientInstance) {
+      supabaseClientInstance = createClient(url, key, {
+        auth: {
+          persistSession: false,
+          autoRefreshToken: false,
+        },
+      });
+    }
+    return supabaseClientInstance;
+  } catch (err) {
+    console.error('Error creating Supabase client:', err);
+    return null;
   }
-  return supabaseClientInstance;
 }
 
 // Safe fallback client instance export for backward compatibility
-const { url: initialUrl, key: initialKey } = getSupabaseCredentials();
 export const supabase = (function() {
-  if (initialUrl && initialKey) {
-    return createClient(initialUrl, initialKey, {
-      auth: { persistSession: false, autoRefreshToken: false }
-    });
+  try {
+    const { url: initialUrl, key: initialKey } = getSupabaseCredentials();
+    if (initialUrl && initialKey) {
+      return createClient(initialUrl, initialKey, {
+        auth: { persistSession: false, autoRefreshToken: false }
+      });
+    }
+  } catch (err) {
+    console.warn('Initial Supabase client creation warning:', err);
   }
   return createClient('https://placeholder.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.key', {
     auth: { persistSession: false, autoRefreshToken: false }
