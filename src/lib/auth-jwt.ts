@@ -28,6 +28,19 @@ export function verifyAppToken(token: string): { uid: string; email: string; nam
 }
 
 export async function verifyAnyAuthToken(token: string): Promise<AuthenticatedUser | null> {
+  if (!token) return null;
+
+  // 0. Handle Demo Mode tokens
+  if (token === 'demo_token' || token === 'demo_user_123' || token.startsWith('demo_')) {
+    const dbUser = await getOrCreateUser('demo_user_123', 'demo@horological.com', 'Investidor Demo');
+    return {
+      uid: 'demo_user_123',
+      email: 'demo@horological.com',
+      name: 'Investidor Demo',
+      dbUser,
+    };
+  }
+
   // 1. Try local custom JWT verification
   const customDecoded = verifyAppToken(token);
   if (customDecoded) {
@@ -41,17 +54,25 @@ export async function verifyAnyAuthToken(token: string): Promise<AuthenticatedUs
   }
 
   // 2. Try Firebase ID Token verification (for Google Sign-In)
-  try {
-    const decoded = await adminAuth.verifyIdToken(token);
-    const dbUser = await getOrCreateUser(decoded.uid, decoded.email || '', decoded.name || '');
-    return {
-      uid: dbUser?.uid || decoded.uid,
-      email: decoded.email || '',
-      name: decoded.name,
-      dbUser,
-    };
-  } catch (error) {
-    console.error('Failed to verify token (custom & firebase):', error);
-    return null;
+  const parts = token.split('.');
+  if (parts.length === 3) {
+    try {
+      const decoded = await adminAuth.verifyIdToken(token);
+      if (decoded && decoded.uid) {
+        const dbUser = await getOrCreateUser(decoded.uid, decoded.email || '', decoded.name || '');
+        return {
+          uid: dbUser?.uid || decoded.uid,
+          email: decoded.email || '',
+          name: decoded.name,
+          dbUser,
+        };
+      }
+    } catch (error: any) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Firebase ID token verification failed:', error?.message || error);
+      }
+    }
   }
+
+  return null;
 }

@@ -123,7 +123,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.warn('Firebase auth initialization catch:', err);
       resolved = true;
       clearTimeout(timer);
-      setLoading(false);
+      setTimeout(() => setLoading(false), 0);
     }
 
     return () => {

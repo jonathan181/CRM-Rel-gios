@@ -11,12 +11,20 @@ export function getCleanSupabaseUrl(rawUrl?: string): string {
 }
 
 export function getSupabaseCredentials() {
-  const rawUrl =
+  let rawUrl =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
     process.env.SAPBASE_URL ||
     process.env.SUPABASE_REST_URL ||
     '';
+
+  const dbUrl = process.env.DATABASE_URL || process.env.SUPABASE_DATABASE_URL || '';
+  if (!rawUrl && dbUrl) {
+    const match = dbUrl.match(/@db\.([a-z0-9-]+)\.supabase\.co/i);
+    if (match && match[1]) {
+      rawUrl = `https://${match[1]}.supabase.co`;
+    }
+  }
 
   const key =
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
