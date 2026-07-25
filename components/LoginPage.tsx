@@ -1,15 +1,16 @@
 'use client';
 
 import React, { useState } from 'react';
+import { safeFetchJson } from '@/lib/api';
 import { useAuth } from './AuthProvider';
-import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, CheckCircle, KeyRound } from 'lucide-react';
+import { Watch, Mail, Lock, User as UserIcon, LogIn, UserPlus, ShieldCheck, Database, AlertCircle, CheckCircle, KeyRound, Sparkles } from 'lucide-react';
 
 interface LoginPageProps {
   onSuccess?: () => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
-  const { signInWithEmail, signUpWithEmail, signInWithGoogle } = useAuth();
+  const { signInWithEmail, signUpWithEmail, signInWithGoogle, signInAsDemo } = useAuth();
 
   const [mode, setMode] = useState<'login' | 'register' | 'reset'>('login');
   const [name, setName] = useState('');
@@ -53,7 +54,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email: email.trim(), newPassword: password }),
         });
-        const data = await res.json();
+        const data = await safeFetchJson(res);
         if (!res.ok || data.error) {
           throw new Error(data.error || 'Erro ao redefinir a senha.');
         }
@@ -64,7 +65,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       console.error('Erro de autenticação:', err);
       let message = 'Ocorreu um erro ao processar sua solicitação.';
       if (err.code === 'auth/operation-not-allowed') {
-        message = 'O login por E-mail/Senha não está ativado no Firebase Console. Utilize o botão Google para entrar.';
+        message = 'O login por E-mail/Senha não está ativado no Firebase Console. Utilize o botão Google ou Modo Demonstração.';
       } else if (err.code === 'auth/email-already-in-use') {
         message = 'Este e-mail já está cadastrado. Tente fazer login.';
       } else if (err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
@@ -89,7 +90,22 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
       if (onSuccess) onSuccess();
     } catch (err: any) {
       console.error('Erro no login Google:', err);
-      setError('Não foi possível entrar com a conta Google. Tente novamente.');
+      setError('Não foi possível entrar com a conta Google. Tente novamente ou use o Modo Demonstração.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDemoSignIn = async () => {
+    setError(null);
+    setSuccessMsg(null);
+    setLoading(true);
+    try {
+      await signInAsDemo();
+      if (onSuccess) onSuccess();
+    } catch (err: any) {
+      console.error('Erro no modo demonstração:', err);
+      setError('Erro ao iniciar modo demonstração.');
     } finally {
       setLoading(false);
     }
@@ -122,9 +138,20 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
             <span className="text-[#e5e1e4] font-medium">Banco Supabase (PostgreSQL)</span>
           </div>
           <span className="flex items-center gap-1 text-[11px] font-semibold text-[#4edea3] bg-[#4edea3]/10 px-2 py-0.5 rounded-full border border-[#4edea3]/20">
-            <ShieldCheck className="w-3 h-3" /> Conectado
+            <ShieldCheck className="w-3 h-3" /> Ativo
           </span>
         </div>
+
+        {/* Quick Demo Mode Access Button */}
+        <button
+          type="button"
+          onClick={handleDemoSignIn}
+          disabled={loading}
+          className="w-full py-3 bg-[#ffd165]/10 hover:bg-[#ffd165]/20 text-[#ffd165] border border-[#ffd165]/40 font-bold text-xs rounded-xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+        >
+          <Sparkles className="w-4 h-4 text-[#ffd165]" />
+          <span>Acessar Modo Demonstração (Sem Cadastro)</span>
+        </button>
 
         {/* Google OAuth Button */}
         <button
@@ -151,7 +178,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onSuccess }) => {
               d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3 0-5.5-2.2-6.4-5.2L1.9 16c1.8 3.7 5.6 7 10.1 7z"
             />
           </svg>
-          <span>Entrar com conta Google (Recomendado)</span>
+          <span>Entrar com conta Google</span>
         </button>
 
         {/* Divider */}

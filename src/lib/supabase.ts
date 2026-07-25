@@ -46,9 +46,15 @@ export function getSupabaseClient(): SupabaseClient | null {
   return supabaseClientInstance;
 }
 
-// Fallback client instance export for backward compatibility
+// Safe fallback client instance export for backward compatibility
 const { url: initialUrl, key: initialKey } = getSupabaseCredentials();
-export const supabase = createClient(
-  initialUrl || 'https://placeholder.supabase.co',
-  initialKey || 'placeholder-key'
-);
+export const supabase = (function() {
+  if (initialUrl && initialKey) {
+    return createClient(initialUrl, initialKey, {
+      auth: { persistSession: false, autoRefreshToken: false }
+    });
+  }
+  return createClient('https://placeholder.supabase.co', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.key', {
+    auth: { persistSession: false, autoRefreshToken: false }
+  });
+})();

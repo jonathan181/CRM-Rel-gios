@@ -1,9 +1,5 @@
-import { db } from './index';
-import { watches } from './schema';
-import { eq, and, or } from 'drizzle-orm';
 import { Watch } from '@/types/watch';
 import { getSupabaseClient } from '../lib/supabase';
-import { getUserByUid } from './users';
 
 function mapRowToWatch(r: any): Watch {
   const serialNumber = r.serial_number ?? r.serialNumber ?? undefined;
@@ -110,207 +106,113 @@ function mapWatchToSupabaseRow(watch: Watch, userUid: string, userId?: number | 
 }
 
 export async function getWatchesFromDb(userUid: string): Promise<Watch[]> {
-  // 1. Primary DB: Drizzle / PostgreSQL pool
-  try {
-    const userRow = await getUserByUid(userUid);
-    const userId = userRow?.id;
-
-    let rows: any[] = [];
-    if (userId) {
-      rows = await db
-        .select()
-        .from(watches)
-        .where(or(eq(watches.userUid, userUid), eq(watches.userId, userId)));
-    } else {
-      rows = await db
-        .select()
-        .from(watches)
-        .where(eq(watches.userUid, userUid));
-    }
-
-    if (rows && rows.length > 0) {
-      return rows.map((r) => mapRowToWatch(r));
-    }
-  } catch (error) {
-    console.error('Error fetching watches from DB via Drizzle:', error);
+  const supabaseClient = getSupabaseClient();
+  if (!supabaseClient) {
+    return [];
   }
 
-  // 2. Secondary DB: Supabase client
-  const supabaseClient = getSupabaseClient();
-  if (supabaseClient) {
-    try {
-      let sbUserId: number | null = null;
-      let canonicalUid = userUid;
+  try {
+    let sbUserId: number | null = null;
+    let canonicalUid = userUid;
 
-      const { data: userRow } = await supabaseClient
-        .from('users')
-        .select('id, uid')
-        .eq('uid', userUid)
-        .maybeSingle();
+    const { data: userRow } = await supabaseClient
+      .from('users')
+      .select('id, uid')
+      .eq('uid', userUid)
+      .maybeSingle();
 
-      if (userRow) {
-        sbUserId = userRow.id;
-        if (userRow.uid) canonicalUid = userRow.uid;
-      }
-
-      let query = supabaseClient.from('watches').select('*');
-      if (sbUserId) {
-        query = query.or(`user_uid.eq.${canonicalUid},user_id.eq.${sbUserId}`);
-      } else {
-        query = query.eq('user_uid', canonicalUid);
-      }
-
-      const { data, error } = await query;
-
-      if (!error && Array.isArray(data) && data.length > 0) {
-        return data.map(mapRowToWatch);
-      }
-    } catch (err) {
-      console.error('Error fetching watches via Supabase client:', err);
+    if (userRow) {
+      sbUserId = userRow.id;
+      if (userRow.uid) canonicalUid = userRow.uid;
     }
+
+    let query = supabaseClient.from('watches').select('*');
+    if (sbUserId) {
+      query = query.or(`user_uid.eq.${canonicalUid},user_id.eq.${sbUserId}`);
+    } else {
+      query = query.eq('user_uid', canonicalUid);
+    }
+
+    const { data, error } = await query;
+
+    if (!error && Array.isArray(data) && data.length > 0) {
+      return data.map(mapRowToWatch);
+    }
+  } catch (err) {
+    console.error('Error fetching watches via Supabase client:', err);
   }
 
   return [];
 }
 
 export async function upsertWatchInDb(watch: Watch, userUid: string, userId?: number | null): Promise<Watch> {
-  // 1. Primary DB: Drizzle / PostgreSQL pool
-  try {
-    let resolvedUserId = userId || null;
-    if (!resolvedUserId) {
-      const userRow = await getUserByUid(userUid);
-      if (userRow?.id) resolvedUserId = userRow.id;
-    }
-
-    const values = {
-      id: watch.id,
-      userId: resolvedUserId,
-      userUid,
-      brand: watch.brand,
-      model: watch.model,
-      ref: watch.ref,
-      serialNumber: watch.serialNumber || null,
-      condition: watch.condition,
-      purchaseDate: watch.purchaseDate,
-      shipmentDateBrazil: watch.shipmentDateBrazil || null,
-      arrivalDateBrazil: watch.arrivalDateBrazil || null,
-      purchaseCurrency: watch.purchaseCurrency,
-      purchasePrice: watch.purchasePrice,
-      freightCost: watch.freightCost,
-      exchangeRate: watch.exchangeRate,
-      taxesBrl: watch.taxesBrl,
-      totalCostBrl: watch.totalCostBrl,
-      supplier: watch.supplier,
-      notesAndSpecs: watch.notesAndSpecs || null,
-      images: watch.images || [],
-      status: watch.status,
-      marketPriceBrl: watch.marketPriceBrl ?? null,
-      salePriceBrl: watch.sale?.salePriceBrl ?? null,
-      salePriceUsd: watch.sale?.salePriceUsd ?? null,
-      saleDate: watch.sale?.saleDate ?? null,
-      shippingAndFeesBrl: watch.sale?.shippingAndFeesBrl ?? null,
-      buyerName: watch.sale?.buyerName ?? null,
-      buyerContact: watch.sale?.buyerContact ?? null,
-      saleNotes: watch.sale?.notes ?? null,
-      updatedAt: new Date(),
-    };
-
-    await db.insert(watches)
-      .values(values)
-      .onConflictDoUpdate({
-        target: watches.id,
-        set: values,
-      });
-  } catch (error) {
-    console.error('Error upserting watch in DB via Drizzle:', error);
+  const supabaseClient = getSupabaseClient();
+  if (!supabaseClient) {
+    return watch;
   }
 
-  // 2. Secondary DB: Supabase client
-  const supabaseClient = getSupabaseClient();
-  if (supabaseClient) {
-    try {
-      let resolvedUserId: number | null = userId || null;
-      let canonicalUid = userUid;
+  try {
+    let resolvedUserId: number | null = userId || null;
+    let canonicalUid = userUid;
 
-      if (userUid || userId) {
-        let filterStr = `uid.eq.${userUid}`;
-        if (userId) filterStr += `,id.eq.${userId}`;
+    if (userUid || userId) {
+      let filterStr = `uid.eq.${userUid}`;
+      if (userId) filterStr += `,id.eq.${userId}`;
 
-        const { data: existingSbUser } = await supabaseClient
-          .from('users')
-          .select('id, uid')
-          .or(filterStr)
-          .maybeSingle();
+      const { data: existingSbUser } = await supabaseClient
+        .from('users')
+        .select('id, uid')
+        .or(filterStr)
+        .maybeSingle();
 
-        if (existingSbUser?.id) {
-          resolvedUserId = existingSbUser.id;
-          if (existingSbUser.uid) canonicalUid = existingSbUser.uid;
-        }
+      if (existingSbUser?.id) {
+        resolvedUserId = existingSbUser.id;
+        if (existingSbUser.uid) canonicalUid = existingSbUser.uid;
       }
-
-      const rowData = mapWatchToSupabaseRow(watch, canonicalUid, resolvedUserId);
-      const { error: sbErr } = await supabaseClient
-        .from('watches')
-        .upsert(rowData, { onConflict: 'id' });
-
-      if (sbErr && sbErr.code === 'PGRST204') {
-        // Fallback if Supabase schema cache lacks new columns
-        delete rowData.shipment_date_brazil;
-        delete rowData.arrival_date_brazil;
-        await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
-      }
-    } catch (err) {
-      console.warn('Error upserting watch via Supabase client:', err);
     }
+
+    const rowData = mapWatchToSupabaseRow(watch, canonicalUid, resolvedUserId);
+    const { error: sbErr } = await supabaseClient
+      .from('watches')
+      .upsert(rowData, { onConflict: 'id' });
+
+    if (sbErr && sbErr.code === 'PGRST204') {
+      // Fallback if Supabase schema cache lacks optional columns
+      delete rowData.shipment_date_brazil;
+      delete rowData.arrival_date_brazil;
+      await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
+    }
+  } catch (err) {
+    console.warn('Error upserting watch via Supabase client:', err);
   }
 
   return watch;
 }
 
 export async function deleteWatchFromDb(watchId: string, userUid: string): Promise<void> {
-  // 1. Primary DB: Drizzle / PostgreSQL pool
-  try {
-    await db.delete(watches).where(and(eq(watches.id, watchId), eq(watches.userUid, userUid)));
-  } catch (error) {
-    console.error('Error deleting watch from DB via Drizzle:', error);
-  }
-
-  // 2. Secondary DB: Supabase client
   const supabaseClient = getSupabaseClient();
-  if (supabaseClient) {
-    try {
-      await supabaseClient.from('watches').delete().eq('id', watchId);
-    } catch (err) {
-      console.error('Error deleting watch via Supabase client:', err);
-    }
+  if (!supabaseClient) return;
+
+  try {
+    await supabaseClient.from('watches').delete().eq('id', watchId);
+  } catch (err) {
+    console.error('Error deleting watch via Supabase client:', err);
   }
 }
 
 export async function replaceAllWatchesInDb(newWatches: Watch[], userUid: string, userId?: number): Promise<Watch[]> {
-  // 1. Primary DB: Drizzle / PostgreSQL pool
-  try {
-    await db.delete(watches).where(eq(watches.userUid, userUid));
-    for (const w of newWatches) {
-      await upsertWatchInDb(w, userUid, userId);
-    }
-  } catch (error) {
-    console.error('Error replacing watches in DB via Drizzle:', error);
-  }
-
-  // 2. Secondary DB: Supabase client
   const supabaseClient = getSupabaseClient();
-  if (supabaseClient) {
-    try {
-      await supabaseClient.from('watches').delete().eq('user_uid', userUid);
-      for (const w of newWatches) {
-        const rowData = mapWatchToSupabaseRow(w, userUid, userId);
-        await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
-      }
-    } catch (err) {
-      console.error('Error replaceAllWatches via Supabase client:', err);
+  if (!supabaseClient) return newWatches;
+
+  try {
+    await supabaseClient.from('watches').delete().eq('user_uid', userUid);
+    for (const w of newWatches) {
+      const rowData = mapWatchToSupabaseRow(w, userUid, userId);
+      await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
     }
+  } catch (err) {
+    console.error('Error replaceAllWatches via Supabase client:', err);
   }
 
   return newWatches;
 }
-

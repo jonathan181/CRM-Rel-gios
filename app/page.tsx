@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { safeFetchJson } from '@/lib/api';
 import { Watch, SaleDetails } from '@/types/watch';
 import { getWatches, saveWatches, resetToInitialWatches } from '@/lib/storage';
 import { INITIAL_WATCHES } from '@/lib/initialData';
@@ -32,7 +33,7 @@ export default function Home() {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
-        const data = await res.json();
+        const data = await safeFetchJson(res);
         if (Array.isArray(data.watches)) {
           setWatches(data.watches);
           saveWatches(data.watches);

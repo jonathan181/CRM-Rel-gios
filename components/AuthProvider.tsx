@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState } from 'react';
+import { safeFetchJson } from '@/lib/api';
 import { auth, googleAuthProvider } from '@/lib/firebase';
 import {
   signInWithPopup,
@@ -21,6 +22,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<AppUser | null>;
   signInWithEmail: (email: string, password: string) => Promise<AppUser | null>;
   signUpWithEmail: (name: string, email: string, password: string) => Promise<AppUser | null>;
+  signInAsDemo: () => Promise<AppUser>;
   signOutUser: () => Promise<void>;
   getToken: () => Promise<string | null>;
 }
@@ -31,6 +33,7 @@ const AuthContext = createContext<AuthContextType>({
   signInWithGoogle: async () => null,
   signInWithEmail: async () => null,
   signUpWithEmail: async () => null,
+  signInAsDemo: async () => ({ uid: 'demo_user', email: 'demo@horological.com', displayName: 'Investidor Demo' }),
   signOutUser: async () => {},
   getToken: async () => null,
 });
@@ -42,60 +45,107 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // 1. Check for stored custom JWT user (Email/Password)
-    const storedAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (storedAuth) {
-      try {
-        const parsed = JSON.parse(storedAuth);
-        if (parsed && parsed.user && parsed.token) {
-          requestAnimationFrame(() => {
-            setUser(parsed.user);
-            setLoading(false);
-          });
-        }
-      } catch (e) {
-        console.error('Failed to parse local auth session:', e);
+    let resolved = false;
+
+    // Safety timeout: ensure loading screen disappears after max 1.5s
+    const timer = setTimeout(() => {
+      if (!resolved) {
+        setLoading(false);
       }
+    }, 1500);
+
+    // 1. Check for stored custom JWT or Demo session
+    try {
+      const storedAuth = typeof window !== 'undefined' ? localStorage.getItem(AUTH_STORAGE_KEY) : null;
+      if (storedAuth) {
+        const parsed = JSON.parse(storedAuth);
+        if (parsed && parsed.user) {
+          const userVal = parsed.user;
+          resolved = true;
+          setTimeout(() => {
+            setUser(userVal);
+            setLoading(false);
+          }, 0);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to parse local auth session:', e);
     }
 
-    // 2. Listen for Firebase Google Auth changes
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const appUser: AppUser = {
-          uid: currentUser.uid,
-          email: currentUser.email,
-          displayName: currentUser.displayName,
-          photoURL: currentUser.photoURL,
-        };
-        setUser(appUser);
+    // 2. Listen for Firebase Auth changes
+    let unsubscribe = () => {};
+    try {
+      unsubscribe = onAuthStateChanged(
+        auth,
+        async (currentUser) => {
+          resolved = true;
+          clearTimeout(timer);
+          if (currentUser) {
+            const appUser: AppUser = {
+              uid: currentUser.uid,
+              email: currentUser.email,
+              displayName: currentUser.displayName,
+              photoURL: currentUser.photoURL,
+            };
+            setUser(appUser);
 
-        try {
-          const token = await currentUser.getIdToken();
-          await fetch('/api/users/sync', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              Authorization: `Bearer ${token}`,
-            },
-            body: JSON.stringify({
-              name: currentUser.displayName || '',
-            }),
-          });
-        } catch (e) {
-          console.error('Error auto-syncing user to Cloud SQL:', e);
+            try {
+              const token = await currentUser.getIdToken();
+              await fetch('/api/users/sync', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                  name: currentUser.displayName || '',
+                }),
+              });
+            } catch (e) {
+              console.error('Error auto-syncing user:', e);
+            }
+          } else {
+            const localAuth = localStorage.getItem(AUTH_STORAGE_KEY);
+            if (!localAuth) {
+              setUser(null);
+            }
+          }
+          setLoading(false);
+        },
+        (error) => {
+          console.warn('Firebase auth state error:', error);
+          resolved = true;
+          clearTimeout(timer);
+          setLoading(false);
         }
-      } else {
-        // If no Firebase user and no custom user, clear
-        const localAuth = localStorage.getItem(AUTH_STORAGE_KEY);
-        if (!localAuth) {
-          setUser(null);
-        }
-      }
+      );
+    } catch (err) {
+      console.warn('Firebase auth initialization catch:', err);
+      resolved = true;
+      clearTimeout(timer);
       setLoading(false);
-    });
+    }
 
-    return () => unsubscribe();
+    return () => {
+      clearTimeout(timer);
+      unsubscribe();
+    };
   }, []);
+
+  const signInAsDemo = async (): Promise<AppUser> => {
+    const demoUser: AppUser = {
+      uid: 'demo_user_123',
+      email: 'demo@horological.com',
+      displayName: 'Investidor Demo',
+    };
+    localStorage.setItem(
+      AUTH_STORAGE_KEY,
+      JSON.stringify({ token: 'demo_token', user: demoUser })
+    );
+    setUser(demoUser);
+    setLoading(false);
+    return demoUser;
+  };
 
   const signInWithGoogle = async (): Promise<AppUser | null> => {
     try {
@@ -136,7 +186,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ name, email, password }),
       });
 
-      const data = await res.json();
+      const data = await safeFetchJson(res);
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Erro ao realizar cadastro.');
       }
@@ -166,7 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const data = await safeFetchJson(res);
       if (!res.ok || data.error) {
         throw new Error(data.error || 'Erro ao realizar login.');
       }
@@ -189,7 +239,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOutUser = async () => {
     try {
       localStorage.removeItem(AUTH_STORAGE_KEY);
-      await firebaseSignOut(auth);
+      try {
+        await firebaseSignOut(auth);
+      } catch (e) {
+        console.warn('Firebase signout warning:', e);
+      }
       setUser(null);
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
@@ -197,7 +251,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const getToken = async (): Promise<string | null> => {
-    // 1. Check custom JWT token
+    // 1. Check custom JWT or Demo token
     const stored = localStorage.getItem(AUTH_STORAGE_KEY);
     if (stored) {
       try {
@@ -228,6 +282,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
+        signInAsDemo,
         signOutUser,
         getToken,
       }}

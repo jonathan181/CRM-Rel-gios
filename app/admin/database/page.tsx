@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { safeFetchJson } from '@/lib/api';
 import { useAuth } from '@/components/AuthProvider';
 import { Database, Users, Watch, RefreshCw, ArrowLeft, ShieldCheck, Search, HardDrive } from 'lucide-react';
 import Link from 'next/link';
@@ -28,12 +29,11 @@ export default function DatabaseViewerPage() {
         headers: { Authorization: `Bearer ${token}` },
       });
 
+      const json = await safeFetchJson(res);
       if (!res.ok) {
-        const errJson = await res.json();
-        throw new Error(errJson.error || 'Erro ao carregar registros do banco.');
+        throw new Error(json.error || 'Erro ao carregar registros do banco.');
       }
 
-      const json = await res.json();
       setData(json);
     } catch (err: any) {
       setError(err.message || 'Erro desconhecido ao carregar banco de dados.');

@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
-import { db } from '@/src/db';
-import { users } from '@/src/db/schema';
-import { eq } from 'drizzle-orm';
-import { getUserByEmail } from '@/src/db/users';
+import { getUserByEmail, updateUserPasswordByEmail } from '@/src/db/users';
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,11 +31,7 @@ export async function POST(req: NextRequest) {
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-
-    await db
-      .update(users)
-      .set({ password: hashedPassword })
-      .where(eq(users.email, cleanEmail));
+    await updateUserPasswordByEmail(cleanEmail, hashedPassword);
 
     return NextResponse.json({
       success: true,

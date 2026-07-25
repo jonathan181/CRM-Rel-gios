@@ -1,8 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyAnyAuthToken } from '@/src/lib/auth-jwt';
-import { db } from '@/src/db';
-import { users, watches } from '@/src/db/schema';
-import { desc } from 'drizzle-orm';
 import { getSupabaseClient } from '@/src/lib/supabase';
 
 export async function GET(req: NextRequest) {
@@ -24,7 +21,6 @@ export async function GET(req: NextRequest) {
 
     let allUsers: any[] = [];
     let allWatches: any[] = [];
-    let connectedVia = 'Drizzle ORM';
 
     if (supabaseClient) {
       try {
@@ -32,25 +28,8 @@ export async function GET(req: NextRequest) {
         const { data: swData } = await supabaseClient.from('watches').select('*').order('created_at', { ascending: false });
         if (suData) allUsers = suData;
         if (swData) allWatches = swData;
-        connectedVia = 'Supabase REST API Client';
       } catch (sbErr) {
         console.error('Admin DB fetch via Supabase error:', sbErr);
-      }
-    }
-
-    if (allUsers.length === 0 && allWatches.length === 0) {
-      try {
-        allUsers = await db.select({
-          id: users.id,
-          uid: users.uid,
-          name: users.name,
-          email: users.email,
-          createdAt: users.createdAt,
-        }).from(users).orderBy(desc(users.id));
-
-        allWatches = await db.select().from(watches).orderBy(desc(watches.createdAt));
-      } catch (drizzleErr) {
-        console.error('Admin DB fetch via Drizzle error:', drizzleErr);
       }
     }
 
@@ -66,9 +45,9 @@ export async function GET(req: NextRequest) {
       summary: {
         totalUsers: allUsers.length,
         totalWatches: allWatches.length,
-        databaseType: 'Supabase (PostgreSQL)',
-        connectionType: connectedVia,
-        status: 'Connected',
+        databaseType: 'Supabase (PostgreSQL REST API)',
+        connectionType: supabaseClient ? 'Supabase Client Connected' : 'Disconnected (Missing Supabase Credentials)',
+        status: supabaseClient ? 'Connected' : 'Offline',
       },
       tables: {
         users: allUsers,
@@ -80,4 +59,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message || 'Erro ao consultar banco de dados.' }, { status: 500 });
   }
 }
-
