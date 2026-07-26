@@ -58,4 +58,4 @@ export interface InventoryStats {
   averageHoldingDays: number;
 }
 
-export type PeriodFilter = 'Este Mês' | 'Últimos 30 Dias' | 'No Ano' | 'Todos';
+export type PeriodFilter = 'Este Mês' | 'Últimos 30 Dias' | 'No Ano' | 'Personalizado' | 'Todos';

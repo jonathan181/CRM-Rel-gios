@@ -108,8 +108,10 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
                 type="number"
                 step="0.01"
                 required
-                value={salePriceBrl}
+                value={salePriceBrl || ''}
                 onChange={(e) => setSalePriceBrl(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
+                placeholder="0"
                 className="w-full pl-10 pr-4 py-2.5 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-sm font-mono text-[#e5e1e4] outline-none"
               />
             </div>
@@ -138,8 +140,9 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
               <input
                 type="number"
                 step="0.01"
-                value={shippingAndFeesBrl}
+                value={shippingAndFeesBrl || ''}
                 onChange={(e) => setShippingAndFeesBrl(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
                 placeholder="R$ 0"
               />

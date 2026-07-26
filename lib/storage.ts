@@ -45,11 +45,15 @@ export function calculateInventoryStats(watches: Watch[]): InventoryStats {
     return acc + (w.marketPriceBrl || w.totalCostBrl);
   }, 0);
 
-  // Vendas acumuladas
-  const totalRevenueBrl = soldWatches.reduce((acc, w) => acc + (w.sale?.salePriceBrl || 0), 0);
+  // Vendas acumuladas (Receita Líquida = Preço de Venda - Frete & Taxas Venda)
+  const totalRevenueBrl = soldWatches.reduce((acc, w) => {
+    const salePrice = w.sale?.salePriceBrl || 0;
+    const fees = w.sale?.shippingAndFeesBrl || 0;
+    return acc + (salePrice - fees);
+  }, 0);
   const totalCogsBrl = soldWatches.reduce((acc, w) => acc + w.totalCostBrl, 0);
   const totalSellingFees = soldWatches.reduce((acc, w) => acc + (w.sale?.shippingAndFeesBrl || 0), 0);
-  const netProfitBrl = totalRevenueBrl - totalCogsBrl - totalSellingFees;
+  const netProfitBrl = totalRevenueBrl - totalCogsBrl;
 
   const averageMarginPercent = totalRevenueBrl > 0 
     ? ((netProfitBrl / totalRevenueBrl) * 100) 

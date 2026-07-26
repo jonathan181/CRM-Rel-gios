@@ -455,6 +455,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 min="0"
                 value={purchasePrice || ''}
                 onChange={(e) => setPurchasePrice(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0"
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
               />
@@ -471,6 +472,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 min="0"
                 value={freightCost || ''}
                 onChange={(e) => setFreightCost(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0"
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
               />
@@ -487,6 +489,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 disabled={purchaseCurrency === 'BRL'}
                 value={purchaseCurrency === 'BRL' ? 1.0 : exchangeRate}
                 onChange={(e) => setExchangeRate(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 placeholder={purchaseCurrency === 'CNY' ? 'ex: 1.18' : 'ex: 5.50'}
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none disabled:opacity-50"
               />
@@ -504,6 +507,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 step="0.01"
                 value={taxesBrl || ''}
                 onChange={(e) => setTaxesBrl(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 placeholder="R$ 0"
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
               />
@@ -519,6 +523,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                 step="0.01"
                 value={marketPriceBrl || ''}
                 onChange={(e) => setMarketPriceBrl(parseFloat(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 placeholder="Ex: R$ 32.000"
                 className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs font-mono text-[#ffd165] outline-none"
               />
@@ -779,6 +784,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     required
                     value={salePriceBrl || ''}
                     onChange={(e) => setSalePriceBrl(parseFloat(e.target.value) || 0)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="R$ 0"
                     className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#4edea3] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
                   />
@@ -806,6 +812,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
                     step="0.01"
                     value={saleShippingAndFeesBrl || ''}
                     onChange={(e) => setSaleShippingAndFeesBrl(parseFloat(e.target.value) || 0)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="R$ 0"
                     className="w-full px-3 py-2 bg-[#131315] border border-[#27272a] focus:border-[#4edea3] rounded-xl text-xs font-mono text-[#e5e1e4] outline-none"
                   />

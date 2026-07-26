@@ -296,22 +296,28 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                   </div>
                 ) : (
                   <div className="pt-3 border-t border-[#27272a] space-y-2">
-                    <div className="grid grid-cols-3 gap-2 text-sm">
-                      <div>
-                        <span className="text-xs text-[#9b8f79] block">Preço de Venda</span>
-                        <span className="font-mono font-bold text-[#e5e1e4]">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
+                      <div className="flex flex-col justify-between">
+                        <span className="text-xs text-[#9b8f79] block leading-tight">Preço de Venda</span>
+                        <span className="font-mono font-bold text-[#e5e1e4] mt-auto pt-1">
                           {formatCurrencyBrl(salePriceBrl)}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-xs text-[#9b8f79] block">Lucro Líquido</span>
-                        <span className={`font-mono font-bold ${netProfit >= 0 ? 'text-[#4edea3]' : 'text-red-400'}`}>
+                      <div className="flex flex-col justify-between">
+                        <span className="text-xs text-[#9b8f79] block leading-tight">Taxas de Venda</span>
+                        <span className="font-mono font-bold text-[#e5e1e4] mt-auto pt-1">
+                          {formatCurrencyBrl(feesBrl)}
+                        </span>
+                      </div>
+                      <div className="flex flex-col justify-between">
+                        <span className="text-xs text-[#9b8f79] block leading-tight">Lucro Líquido</span>
+                        <span className={`font-mono font-bold mt-auto pt-1 ${netProfit >= 0 ? 'text-[#4edea3]' : 'text-red-400'}`}>
                           {formatCurrencyBrl(netProfit)}
                         </span>
                       </div>
-                      <div>
-                        <span className="text-xs text-[#9b8f79] block">Margem %</span>
-                        <span className={`font-mono font-bold ${marginPercent >= 0 ? 'text-[#4edea3]' : 'text-red-400'}`}>
+                      <div className="flex flex-col justify-between">
+                        <span className="text-xs text-[#9b8f79] block leading-tight">Margem %</span>
+                        <span className={`font-mono font-bold mt-auto pt-1 ${marginPercent >= 0 ? 'text-[#4edea3]' : 'text-red-400'}`}>
                           {marginPercent.toFixed(1)}%
                         </span>
                       </div>
