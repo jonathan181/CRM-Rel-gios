@@ -65,6 +65,17 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     initialWatch?.arrivalDateBrazil || ''
   );
 
+  const [notSentYet, setNotSentYet] = useState<boolean>(
+    initialWatch
+      ? !initialWatch.shipmentDateBrazil && initialWatch.status === 'Em Trânsito'
+      : false
+  );
+  const [notArrivedYet, setNotArrivedYet] = useState<boolean>(
+    initialWatch
+      ? (!initialWatch.arrivalDateBrazil && initialWatch.status === 'Em Trânsito')
+      : false
+  );
+
   // Currency & Financial calculation
   const [purchaseCurrency, setPurchaseCurrency] = useState<CurrencyCode>(
     initialWatch?.purchaseCurrency || 'CNY'
@@ -135,6 +146,40 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   // Compute net profit & margin
   const computedNetProfit = salePriceBrl - computedTotalCostBrl - saleShippingAndFeesBrl;
   const computedMarginPercent = salePriceBrl > 0 ? ((computedNetProfit / salePriceBrl) * 100) : 0;
+
+  // Handlers for "Ainda não enviado" and "Ainda não chegou"
+  const handleToggleNotSentYet = () => {
+    const nextVal = !notSentYet;
+    setNotSentYet(nextVal);
+    if (nextVal) {
+      setShipmentDateBrazil('');
+      setArrivalDateBrazil('');
+      setNotArrivedYet(true);
+      if (status === 'Em Estoque') {
+        setStatus('Em Trânsito');
+      }
+    } else {
+      setNotArrivedYet(false);
+      if (status === 'Em Trânsito') {
+        setStatus('Em Estoque');
+      }
+    }
+  };
+
+  const handleToggleNotArrivedYet = () => {
+    const nextVal = !notArrivedYet;
+    setNotArrivedYet(nextVal);
+    if (nextVal) {
+      setArrivalDateBrazil('');
+      if (status === 'Em Estoque') {
+        setStatus('Em Trânsito');
+      }
+    } else {
+      if (!notSentYet && status === 'Em Trânsito') {
+        setStatus('Em Estoque');
+      }
+    }
+  };
 
   // Image handling helpers
   const handleAddDirectLink = () => {
@@ -225,6 +270,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       };
     }
 
+    let finalStatus = status;
+    if ((notSentYet || notArrivedYet) && finalStatus !== 'Vendido' && finalStatus !== 'Consignação') {
+      finalStatus = 'Em Trânsito';
+    }
+
     const watchData: Watch = {
       id: initialWatch?.id || `w-${Date.now()}`,
       brand: finalBrand,
@@ -233,8 +283,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       serialNumber: serialNumber.trim(),
       condition,
       purchaseDate,
-      shipmentDateBrazil: shipmentDateBrazil || undefined,
-      arrivalDateBrazil: arrivalDateBrazil || undefined,
+      shipmentDateBrazil: notSentYet ? undefined : (shipmentDateBrazil || undefined),
+      arrivalDateBrazil: (notArrivedYet || notSentYet) ? undefined : (arrivalDateBrazil || undefined),
       purchaseCurrency,
       purchasePrice,
       freightCost,
@@ -244,7 +294,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       supplier: supplier.trim(),
       notesAndSpecs: notesAndSpecs.trim(),
       images: imageUrls,
-      status,
+      status: finalStatus,
       marketPriceBrl: marketPriceBrl > 0 ? marketPriceBrl : undefined,
       sale,
       createdAt: initialWatch?.createdAt || new Date().toISOString(),
@@ -389,29 +439,69 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#27272a]/40">
             {/* Data de envio para Brasil */}
-            <div>
-              <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[#e5e1e4]">
                 Data de envio para Brasil
               </label>
               <input
                 type="date"
+                disabled={notSentYet}
                 value={shipmentDateBrazil}
-                onChange={(e) => setShipmentDateBrazil(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none"
+                onChange={(e) => {
+                  setShipmentDateBrazil(e.target.value);
+                  if (e.target.value) setNotSentYet(false);
+                }}
+                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none disabled:opacity-40 disabled:cursor-not-allowed"
               />
+              <div>
+                <button
+                  type="button"
+                  onClick={handleToggleNotSentYet}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    notSentYet
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
+                      : 'bg-[#131315] text-[#9b8f79] border-[#27272a] hover:text-[#e5e1e4] hover:border-[#353437]'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${notSentYet ? 'bg-blue-400 animate-pulse' : 'bg-gray-500'}`} />
+                  <span>Ainda não enviado</span>
+                </button>
+              </div>
             </div>
 
             {/* Data de chegada no Brasil */}
-            <div>
-              <label className="block text-xs font-semibold text-[#e5e1e4] mb-1.5">
+            <div className="space-y-1.5">
+              <label className="block text-xs font-semibold text-[#e5e1e4]">
                 Data de chegada no Brasil
               </label>
               <input
                 type="date"
+                disabled={notArrivedYet || notSentYet}
                 value={arrivalDateBrazil}
-                onChange={(e) => setArrivalDateBrazil(e.target.value)}
-                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none"
+                onChange={(e) => {
+                  setArrivalDateBrazil(e.target.value);
+                  if (e.target.value) {
+                    setNotArrivedYet(false);
+                    setNotSentYet(false);
+                  }
+                }}
+                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none disabled:opacity-40 disabled:cursor-not-allowed"
               />
+              <div>
+                <button
+                  type="button"
+                  disabled={notSentYet}
+                  onClick={handleToggleNotArrivedYet}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                    notArrivedYet || notSentYet
+                      ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
+                      : 'bg-[#131315] text-[#9b8f79] border-[#27272a] hover:text-[#e5e1e4] hover:border-[#353437]'
+                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${notArrivedYet || notSentYet ? 'bg-blue-400 animate-pulse' : 'bg-gray-500'}`} />
+                  <span>Ainda não chegou</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -732,11 +822,15 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             </h3>
           </div>
 
-          <div className="flex gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <button
               type="button"
-              onClick={() => setStatus('Em Estoque')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
+              onClick={() => {
+                setStatus('Em Estoque');
+                setNotSentYet(false);
+                setNotArrivedYet(false);
+              }}
+              className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
                 status === 'Em Estoque'
                   ? 'bg-[#ffd165] text-[#131315] border-[#ffd165] shadow-lg scale-[1.02]'
                   : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-[#ffd165]/50'
@@ -747,26 +841,43 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
             <button
               type="button"
+              onClick={() => {
+                setStatus('Em Trânsito');
+                if (!notSentYet && !notArrivedYet) {
+                  setNotArrivedYet(true);
+                }
+              }}
+              className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
+                status === 'Em Trânsito'
+                  ? 'bg-blue-500 text-white border-blue-500 shadow-lg scale-[1.02]'
+                  : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-blue-500/50'
+              }`}
+            >
+              Em Trânsito
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setStatus('Consignação')}
+              className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
+                status === 'Consignação'
+                  ? 'bg-purple-600 text-white border-purple-600 shadow-lg scale-[1.02]'
+                  : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-purple-500/50'
+              }`}
+            >
+              Consignação
+            </button>
+
+            <button
+              type="button"
               onClick={() => setStatus('Vendido')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
+              className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
                 status === 'Vendido'
                   ? 'bg-[#4edea3] text-[#003824] border-[#4edea3] shadow-lg scale-[1.02]'
                   : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-[#4edea3]/50'
               }`}
             >
               Vendido
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setStatus('Consignação')}
-              className={`flex-1 py-3 px-4 rounded-xl font-bold text-xs transition-all border ${
-                status === 'Consignação'
-                  ? 'bg-blue-500 text-white border-blue-500 shadow-lg scale-[1.02]'
-                  : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-blue-500/50'
-              }`}
-            >
-              Consignação
             </button>
           </div>
 
@@ -887,7 +998,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             <button
               type="button"
               onClick={onCancel}
-              className="px-6 py-3 text-xs font-bold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors"
+              className="px-6 py-3 text-xs font-bold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors cursor-pointer"
             >
               Cancelar
             </button>
@@ -895,7 +1006,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
           <button
             type="submit"
-            className="px-8 py-3.5 bg-[#ffd165] text-[#131315] font-bold text-sm rounded-xl hover:bg-[#f7be1d] transition-all shadow-xl flex items-center gap-2"
+            className="px-8 py-3.5 bg-[#ffd165] text-[#131315] font-bold text-sm rounded-xl hover:bg-[#f7be1d] transition-all shadow-xl flex items-center gap-2 cursor-pointer"
           >
             <Check className="w-4 h-4" />
             <span>{initialWatch ? 'Atualizar Registro' : 'Salvar Registro'}</span>

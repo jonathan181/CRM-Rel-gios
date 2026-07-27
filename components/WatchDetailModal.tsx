@@ -31,6 +31,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
 
   const isSold = watch.status === 'Vendido';
   const isConsignment = watch.status === 'Consignação';
+  const isInTransit = watch.status === 'Em Trânsito';
 
   const salePriceBrl = watch.sale?.salePriceBrl || 0;
   const feesBrl = watch.sale?.shippingAndFeesBrl || 0;
@@ -56,6 +57,8 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                 isSold
                   ? 'bg-[#4edea3]/10 text-[#4edea3] border-[#4edea3]/30'
                   : isConsignment
+                  ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                  : isInTransit
                   ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                   : 'bg-[#ffd165]/10 text-[#ffd165] border-[#ffd165]/30'
               }`}

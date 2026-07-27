@@ -99,11 +99,12 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         return true;
       })
       .sort((a, b) => {
-        // Status priority order: 1. Em Estoque, 2. Consignação, 3. Vendido
+        // Status priority order: 1. Em Estoque, 2. Em Trânsito, 3. Consignação, 4. Vendido
         const STATUS_PRIORITY: Record<string, number> = {
           'Em Estoque': 1,
-          'Consignação': 2,
-          'Vendido': 3
+          'Em Trânsito': 2,
+          'Consignação': 3,
+          'Vendido': 4
         };
 
         const priorityA = STATUS_PRIORITY[a.status] ?? 99;
@@ -142,6 +143,10 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
     const stock = filteredWatches.filter(
       (w) => (w.status || '').toLowerCase() === 'em estoque'
     );
+    const inTransit = filteredWatches.filter((w) => {
+      const s = (w.status || '').toLowerCase();
+      return s === 'em trânsito' || s === 'em transito';
+    });
     const consignment = filteredWatches.filter((w) => {
       const s = (w.status || '').toLowerCase();
       return s === 'consignação' || s === 'consignacao';
@@ -153,6 +158,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       const s = (w.status || '').toLowerCase();
       return (
         s !== 'em estoque' &&
+        s !== 'em trânsito' &&
+        s !== 'em transito' &&
         s !== 'consignação' &&
         s !== 'consignacao' &&
         s !== 'vendido'
@@ -167,9 +174,15 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
         watches: stock,
       },
       {
+        title: 'Em Trânsito',
+        key: 'em-transito',
+        badgeColor: 'border-blue-400/40 bg-blue-500/10 text-blue-400',
+        watches: inTransit,
+      },
+      {
         title: 'Consignação',
         key: 'consignacao',
-        badgeColor: 'border-blue-400/40 bg-blue-500/10 text-blue-400',
+        badgeColor: 'border-purple-400/40 bg-purple-500/10 text-purple-400',
         watches: consignment,
       },
       {
@@ -282,8 +295,9 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
           >
             <option value="Todos">Status: Todos</option>
             <option value="Em Estoque">Em Estoque</option>
-            <option value="Vendido">Vendido</option>
+            <option value="Em Trânsito">Em Trânsito</option>
             <option value="Consignação">Consignação</option>
+            <option value="Vendido">Vendido</option>
           </select>
 
           {/* Brand filter */}
@@ -452,6 +466,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                 isSold
                                   ? 'bg-[#003824]/80 text-[#4edea3] border-[#4edea3]/40'
                                   : isConsignment
+                                  ? 'bg-purple-900/80 text-purple-300 border-purple-400/40'
+                                  : watch.status === 'Em Trânsito'
                                   ? 'bg-blue-900/80 text-blue-300 border-blue-400/40'
                                   : 'bg-[#ffd165]/20 text-[#ffd165] border-[#ffd165]/40'
                               }`}
@@ -650,6 +666,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                                   isSold
                                     ? 'bg-[#4edea3]/10 text-[#4edea3]'
                                     : watch.status === 'Consignação'
+                                    ? 'bg-purple-500/10 text-purple-400'
+                                    : watch.status === 'Em Trânsito'
                                     ? 'bg-blue-500/10 text-blue-400'
                                     : 'bg-[#ffd165]/10 text-[#ffd165]'
                                 }`}
