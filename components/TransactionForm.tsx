@@ -56,7 +56,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [serialNumber, setSerialNumber] = useState<string>(initialWatch?.serialNumber || '');
   const [condition, setCondition] = useState<string>(initialWatch?.condition || 'Novo / Unworn (100%)');
   const [purchaseDate, setPurchaseDate] = useState<string>(
-    initialWatch?.purchaseDate || new Date().toISOString().split('T')[0]
+    initialWatch?.purchaseDate || ''
   );
   const [shipmentDateBrazil, setShipmentDateBrazil] = useState<string>(
     initialWatch?.shipmentDateBrazil || ''
@@ -198,6 +198,10 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     }
     if (!model.trim()) {
       alert('Por favor, informe o modelo / referência.');
+      return;
+    }
+    if (!purchaseDate) {
+      alert('Por favor, informe a Data de Compra.');
       return;
     }
 

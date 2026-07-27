@@ -37,26 +37,32 @@ export function resetToInitialWatches(): Watch[] {
 }
 
 export function calculateInventoryStats(watches: Watch[]): InventoryStats {
-  const activeStock = watches.filter(w => w.status === 'Em Estoque' || w.status === 'Consignação');
-  const soldWatches = watches.filter(w => w.status === 'Vendido' && w.sale);
+  const activeStock = watches.filter(w => {
+    const s = (w.status || '').toLowerCase();
+    return s === 'em estoque' || s === 'consignação' || s === 'consignacao';
+  });
+
+  // Strictly filter only sold watches with sale details
+  const soldWatches = watches.filter(w => {
+    const s = (w.status || '').toLowerCase();
+    return s === 'vendido' && w.sale !== undefined && w.sale !== null;
+  });
 
   // Valor do Estoque Ativo (preço mercado ou custo)
   const totalActiveStockValueBrl = activeStock.reduce((acc, w) => {
     return acc + (w.marketPriceBrl || w.totalCostBrl);
   }, 0);
 
-  // Vendas acumuladas (Receita Líquida = Preço de Venda - Frete & Taxas Venda)
-  const totalRevenueBrl = soldWatches.reduce((acc, w) => {
-    const salePrice = w.sale?.salePriceBrl || 0;
-    const fees = w.sale?.shippingAndFeesBrl || 0;
-    return acc + (salePrice - fees);
-  }, 0);
-  const totalCogsBrl = soldWatches.reduce((acc, w) => acc + w.totalCostBrl, 0);
+  // Vendas acumuladas (Faturamento bruto, taxas e receita líquida)
+  const totalGrossRevenueBrl = soldWatches.reduce((acc, w) => acc + (w.sale?.salePriceBrl || 0), 0);
   const totalSellingFees = soldWatches.reduce((acc, w) => acc + (w.sale?.shippingAndFeesBrl || 0), 0);
+  const totalRevenueBrl = totalGrossRevenueBrl - totalSellingFees; // Receita líquida
+  const totalCogsBrl = soldWatches.reduce((acc, w) => acc + w.totalCostBrl, 0);
   const netProfitBrl = totalRevenueBrl - totalCogsBrl;
 
-  const averageMarginPercent = totalRevenueBrl > 0 
-    ? ((netProfitBrl / totalRevenueBrl) * 100) 
+  // Margem % = (Lucro Líquido / Faturamento Bruto) * 100 (apenas relógios vendidos)
+  const averageMarginPercent = totalGrossRevenueBrl > 0 
+    ? ((netProfitBrl / totalGrossRevenueBrl) * 100) 
     : 0;
 
   // Calculo de giro medio de estoque (dias entre compra e venda)
@@ -75,19 +81,19 @@ export function calculateInventoryStats(watches: Watch[]): InventoryStats {
 
   const averageHoldingDays = countWithHoldingDays > 0 
     ? Math.round(totalHoldingDays / countWithHoldingDays) 
-    : 42;
+    : 0;
 
   // Calculo vendas mês atual
   const now = new Date();
   const currentMonthYear = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   
   const soldThisMonth = soldWatches.filter(w => w.sale?.saleDate?.startsWith(currentMonthYear));
-  const soldCountMonth = soldThisMonth.length > 0 ? soldThisMonth.length : soldWatches.length;
+  const soldCountMonth = soldThisMonth.length;
   const profitMonthBrl = soldThisMonth.reduce((acc, w) => {
     const rev = w.sale?.salePriceBrl || 0;
     const fee = w.sale?.shippingAndFeesBrl || 0;
     return acc + (rev - w.totalCostBrl - fee);
-  }, 0) || netProfitBrl;
+  }, 0);
 
   return {
     totalActiveStockValueBrl,

@@ -15,7 +15,13 @@ import { useAuth } from '@/components/AuthProvider';
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState<'estoque' | 'registrar' | 'analise'>('estoque');
-  const [watches, setWatches] = useState<Watch[]>([]);
+  const [watches, setWatches] = useState<Watch[]>(() => {
+    if (typeof window !== 'undefined') {
+      return getWatches();
+    }
+    return [];
+  });
+  const [isLoadingWatches, setIsLoadingWatches] = useState<boolean>(true);
   const [editingWatch, setEditingWatch] = useState<Watch | null>(null);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -24,11 +30,17 @@ export default function Home() {
 
   // Fetch watches from Cloud SQL when authenticated
   const fetchCloudSqlWatches = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setIsLoadingWatches(false);
+      return;
+    }
     setIsSyncing(true);
     try {
       const token = await getToken();
-      if (!token) return;
+      if (!token) {
+        setIsLoadingWatches(false);
+        return;
+      }
       const res = await fetch('/api/watches', {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -43,6 +55,7 @@ export default function Home() {
       console.error('Error fetching watches from Cloud SQL:', e);
     } finally {
       setIsSyncing(false);
+      setIsLoadingWatches(false);
     }
   }, [user, getToken]);
 
@@ -194,6 +207,8 @@ export default function Home() {
         {activeTab === 'estoque' && (
           <InventoryView
             watches={watches}
+            isLoading={isLoadingWatches}
+            isSyncing={isSyncing}
             onEditWatch={handleEditWatch}
             onConfirmSale={handleConfirmSale}
             onDeleteWatch={handleDeleteWatch}

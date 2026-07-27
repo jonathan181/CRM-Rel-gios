@@ -26,12 +26,64 @@ import {
   ArrowDown, 
   Calendar,
   Layers,
-  PieChart as PieIcon
+  PieChart as PieIcon,
+  Plane
 } from 'lucide-react';
 
 interface FinancialAnalyticsViewProps {
   watches: Watch[];
 }
+
+const CustomTrajectoryTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    return (
+      <div className="bg-[#27272a] border border-[#3f3f46] p-3 rounded-xl shadow-2xl text-xs space-y-1.5 min-w-[170px]">
+        <p className="font-bold text-[#ffd165] text-xs border-b border-[#3f3f46] pb-1 mb-1.5">{label}</p>
+        {payload.map((entry: any, index: number) => {
+          let textColor = '#e5e1e4';
+          if (entry.name === 'Receita Líquida') textColor = '#ffd165';
+          else if (entry.name === 'Lucro') textColor = '#4edea3';
+          else if (entry.name === 'Custo') textColor = '#d4d4d8';
+
+          return (
+            <div key={`item-${index}`} className="flex justify-between items-center gap-3">
+              <span className="flex items-center gap-1.5 text-[#d4d4d8] font-medium">
+                <span
+                  className="w-2 h-2 rounded-full"
+                  style={{ backgroundColor: entry.color === '#2a2a2c' ? '#a1a1aa' : entry.color }}
+                />
+                {entry.name}:
+              </span>
+              <span className="font-mono font-bold" style={{ color: textColor }}>
+                {formatCurrencyBrl(Number(entry.value))}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomPieTooltip = ({ active, payload }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0];
+    const color = data.color || '#ffd165';
+    return (
+      <div className="bg-[#27272a] border border-[#3f3f46] p-2.5 rounded-xl shadow-2xl text-xs space-y-1">
+        <p className="font-bold text-[#e5e1e4] flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: color }} />
+          {data.name}
+        </p>
+        <p className="text-[#d4d4d8] font-mono">
+          {data.value} {Number(data.value) === 1 ? 'unidade' : 'unidades'} ({formatCurrencyBrl(data.payload?.value || 0)})
+        </p>
+      </div>
+    );
+  }
+  return null;
+};
 
 const BRAND_COLORS = ['#ffd165', '#4edea3', '#9b8f79', '#3b82f6', '#ec4899', '#8b5cf6'];
 
@@ -48,21 +100,24 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
 
   // Filter sold watches by selected period or custom date range
   const filteredSoldWatches = useMemo(() => {
-    const sold = watches.filter(w => w.status === 'Vendido' && w.sale?.saleDate);
+    const sold = watches.filter(w => {
+      const isSold = (w.status || '').toLowerCase() === 'vendido';
+      return isSold && w.sale !== undefined && w.sale !== null;
+    });
     const now = new Date();
     const currentYear = now.getFullYear();
     const currentMonthStr = String(now.getMonth() + 1).padStart(2, '0');
     const currentYearMonth = `${currentYear}-${currentMonthStr}`;
 
     return sold.filter(w => {
-      const saleDate = w.sale!.saleDate;
-      if (!saleDate) return false;
+      const saleDate = w.sale?.saleDate;
 
       if (period === 'Este Mês') {
-        return saleDate.startsWith(currentYearMonth);
+        return saleDate ? saleDate.startsWith(currentYearMonth) : false;
       }
 
       if (period === 'Últimos 30 Dias') {
+        if (!saleDate) return false;
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(now.getDate() - 30);
         thirtyDaysAgo.setHours(0, 0, 0, 0);
@@ -71,10 +126,11 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
       }
 
       if (period === 'No Ano') {
-        return saleDate.startsWith(`${currentYear}`);
+        return saleDate ? saleDate.startsWith(`${currentYear}`) : false;
       }
 
       if (period === 'Personalizado') {
+        if (!saleDate) return false;
         if (customStartDate && saleDate < customStartDate) return false;
         if (customEndDate && saleDate > customEndDate) return false;
         return true;
@@ -87,26 +143,45 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
 
   // Compute Performance Stats based on filtered sold watches
   const stats = useMemo(() => {
-    const totalRevenueBrl = filteredSoldWatches.reduce((acc, w) => {
-      const salePrice = w.sale?.salePriceBrl || 0;
-      const fees = w.sale?.shippingAndFeesBrl || 0;
-      return acc + (salePrice - fees);
-    }, 0);
+    const totalGrossRevenueBrl = filteredSoldWatches.reduce((acc, w) => acc + (w.sale?.salePriceBrl || 0), 0);
+    const totalFeesBrl = filteredSoldWatches.reduce((acc, w) => acc + (w.sale?.shippingAndFeesBrl || 0), 0);
+    const totalRevenueBrl = totalGrossRevenueBrl - totalFeesBrl; // Receita líquida
 
     const totalCogsBrl = filteredSoldWatches.reduce((acc, w) => acc + w.totalCostBrl, 0);
     const netProfitBrl = totalRevenueBrl - totalCogsBrl;
-    const averageMarginPercent = totalRevenueBrl > 0 ? ((netProfitBrl / totalRevenueBrl) * 100) : 0;
+
+    // Margem % = (Lucro Líquido / Faturamento Bruto) * 100 (apenas de relógios vendidos)
+    const averageMarginPercent = totalGrossRevenueBrl > 0 
+      ? ((netProfitBrl / totalGrossRevenueBrl) * 100) 
+      : 0;
 
     let averageHoldingDays = 0;
     if (filteredSoldWatches.length > 0) {
       const totalDays = filteredSoldWatches.reduce((acc, w) => {
+        if (!w.purchaseDate || !w.sale?.saleDate) return acc;
         const pDate = new Date(w.purchaseDate);
-        const sDate = new Date(w.sale!.saleDate);
+        const sDate = new Date(w.sale.saleDate);
         const diffTime = sDate.getTime() - pDate.getTime();
         const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
         return acc + diffDays;
       }, 0);
       averageHoldingDays = Math.round(totalDays / filteredSoldWatches.length);
+    }
+
+    // Calculation for Brazil arrival to final sale
+    let averageBrazilHoldingDays: number | null = null;
+    let brazilCount = 0;
+    const watchesWithBrazilDate = filteredSoldWatches.filter(w => w.shipmentDateBrazil && w.sale?.saleDate);
+    if (watchesWithBrazilDate.length > 0) {
+      const totalBrazilDays = watchesWithBrazilDate.reduce((acc, w) => {
+        const bDate = new Date(w.shipmentDateBrazil!.length === 10 ? `${w.shipmentDateBrazil}T00:00:00` : w.shipmentDateBrazil!);
+        const sDate = new Date(w.sale!.saleDate.length === 10 ? `${w.sale!.saleDate}T00:00:00` : w.sale!.saleDate);
+        const diffTime = sDate.getTime() - bDate.getTime();
+        const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
+        return acc + diffDays;
+      }, 0);
+      brazilCount = watchesWithBrazilDate.length;
+      averageBrazilHoldingDays = Math.round(totalBrazilDays / brazilCount);
     }
 
     return {
@@ -115,6 +190,8 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
       netProfitBrl,
       averageMarginPercent,
       averageHoldingDays,
+      averageBrazilHoldingDays,
+      brazilCount,
       count: filteredSoldWatches.length
     };
   }, [filteredSoldWatches]);
@@ -380,7 +457,12 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
             <span className="text-2xl md:text-3xl font-extrabold text-[#e5e1e4] font-mono">
               {stats.averageMarginPercent.toFixed(1)}%
             </span>
-            <div className="w-full bg-[#353437] h-1.5 rounded-full mt-3 overflow-hidden">
+            <span className="text-[#9b8f79] text-xs font-medium mt-1 flex items-center gap-1">
+              {stats.count > 0 
+                ? `Calculada sobre ${stats.count} ${stats.count === 1 ? 'relógio vendido' : 'relógios vendidos'}`
+                : 'Apenas relógios vendidos'}
+            </span>
+            <div className="w-full bg-[#353437] h-1.5 rounded-full mt-2.5 overflow-hidden">
               <div
                 className="bg-[#ffd165] h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, Math.max(0, stats.averageMarginPercent))}%` }}
@@ -424,16 +506,7 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                 <XAxis dataKey="month" stroke="#9b8f79" fontSize={11} tickLine={false} />
                 <YAxis stroke="#9b8f79" fontSize={10} tickFormatter={(v) => `R$${v/1000}k`} tickLine={false} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#18181b',
-                    borderColor: '#27272a',
-                    borderRadius: '12px',
-                    color: '#e5e1e4',
-                    fontSize: '12px'
-                  }}
-                  formatter={(value: any) => [formatCurrencyBrl(Number(value)), '']}
-                />
+                <Tooltip content={<CustomTrajectoryTooltip />} />
                 <Bar dataKey="Custo" fill="#2a2a2c" radius={[4, 4, 0, 0]} barSize={20} />
                 <Bar dataKey="Receita Líquida" fill="#ffd165" radius={[4, 4, 0, 0]} barSize={20} />
                 <Line type="monotone" dataKey="Lucro" stroke="#4edea3" strokeWidth={3} dot={{ fill: '#4edea3', r: 4 }} />
@@ -464,19 +537,7 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
                       <Cell key={`cell-${index}`} fill={BRAND_COLORS[index % BRAND_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip
-                    contentStyle={{
-                      backgroundColor: '#18181b',
-                      borderColor: '#27272a',
-                      borderRadius: '12px',
-                      color: '#e5e1e4',
-                      fontSize: '12px'
-                    }}
-                    formatter={(val: any, name: any, item: any) => [
-                      `${val} ${Number(val) === 1 ? 'unidade' : 'unidades'} (${formatCurrencyBrl(item?.payload?.value || 0)})`,
-                      'Vendas'
-                    ]}
-                  />
+                  <Tooltip content={<CustomPieTooltip />} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
@@ -508,34 +569,78 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
           </div>
         </div>
 
-        {/* Tempo Médio de Retenção Metric */}
-        <div className="lg:col-span-12 glass-card p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-lg">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-[#ffd165]/10 border border-[#ffd165]/20 flex items-center justify-center text-[#ffd165]">
-              <History className="w-7 h-7" />
+        {/* Retenção & Chegada Brasil Metrics */}
+        <div className="lg:col-span-12 grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Tempo Médio de Retenção (Fornecedor -> Liquidação) */}
+          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#ffd165]/10 border border-[#ffd165]/20 flex items-center justify-center text-[#ffd165] flex-shrink-0">
+                  <History className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-[#e5e1e4]">Tempo Médio de Retenção</h4>
+                  <p className="text-xs text-[#9b8f79] mt-0.5">
+                    Duração média em dias entre a compra no fornecedor e a liquidação final.
+                  </p>
+                </div>
+              </div>
             </div>
-            <div>
-              <h4 className="text-base font-bold text-[#e5e1e4]">Tempo Médio de Retenção</h4>
-              <p className="text-xs text-[#9b8f79]">
-                Duração média em dias entre a compra no fornecedor e a liquidação final.
-              </p>
+
+            <div className="flex items-end justify-between pt-2 border-t border-[#27272a]">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-[#ffd165] font-mono">
+                  {stats.averageHoldingDays}
+                </span>
+                <span className="text-xs font-bold text-[#9b8f79] uppercase">Dias</span>
+              </div>
+              <div className="text-right">
+                <span className="text-[#4edea3] text-[11px] font-bold flex items-center justify-end gap-1 font-mono">
+                  <ArrowDown className="w-3 h-3" /> Meta: 30-45 dias
+                </span>
+                <p className="text-[10px] text-[#9b8f79] mt-0.5">
+                  Calculado sobre {stats.count} {stats.count === 1 ? 'venda' : 'vendas'}
+                </p>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-baseline gap-2">
-            <span className="text-4xl font-extrabold text-[#ffd165] font-mono">
-              {stats.averageHoldingDays}
-            </span>
-            <span className="text-sm font-bold text-[#9b8f79] uppercase">Dias</span>
-          </div>
+          {/* Tempo Médio Pós-Chegada Brasil (Chegada BR -> Liquidação) */}
+          <div className="glass-card p-6 rounded-2xl flex flex-col justify-between gap-4 shadow-lg">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-[#4edea3]/10 border border-[#4edea3]/20 flex items-center justify-center text-[#4edea3] flex-shrink-0">
+                  <Plane className="w-6 h-6" />
+                </div>
+                <div>
+                  <h4 className="text-base font-bold text-[#e5e1e4]">Tempo Médio Pós-Chegada Brasil</h4>
+                  <p className="text-xs text-[#9b8f79] mt-0.5">
+                    Duração média em dias entre a chegada no Brasil e a liquidação final.
+                  </p>
+                </div>
+              </div>
+            </div>
 
-          <div className="flex flex-col items-end text-right">
-            <span className="text-[#4edea3] text-xs font-bold flex items-center gap-1 font-mono">
-              <ArrowDown className="w-3.5 h-3.5" /> 8 dias mais rápido que o mês passado
-            </span>
-            <p className="text-[11px] text-[#9b8f79] mt-0.5 italic">
-              Meta de giro ideal do acervo: 30-45 dias
-            </p>
+            <div className="flex items-end justify-between pt-2 border-t border-[#27272a]">
+              <div className="flex items-baseline gap-2">
+                <span className="text-3xl font-extrabold text-[#4edea3] font-mono">
+                  {stats.averageBrazilHoldingDays !== null ? stats.averageBrazilHoldingDays : '--'}
+                </span>
+                <span className="text-xs font-bold text-[#9b8f79] uppercase">
+                  {stats.averageBrazilHoldingDays !== null ? 'Dias' : ''}
+                </span>
+              </div>
+              <div className="text-right">
+                <p className="text-[11px] text-[#e5e1e4] font-medium">
+                  {stats.brazilCount > 0
+                    ? `${stats.brazilCount} ${stats.brazilCount === 1 ? 'relógio contabilizado' : 'relógios contabilizados'}`
+                    : 'Nenhum relógio com chegada no Brasil'}
+                </p>
+                <p className="text-[10px] text-[#9b8f79] mt-0.5">
+                  Ignora relógios sem data no Brasil
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
