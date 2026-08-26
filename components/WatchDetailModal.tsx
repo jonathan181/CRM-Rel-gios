@@ -74,7 +74,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                 onClose();
                 onEdit(watch);
               }}
-              className="p-2 text-[#e5e1e4] hover:text-[#ffd165] hover:bg-[#27272a] rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold"
+              className="p-2 text-[#e5e1e4] hover:text-[#ffd165] hover:bg-[#27272a] rounded-lg transition-colors flex items-center gap-1.5 text-xs font-semibold cursor-pointer"
             >
               <Edit className="w-4 h-4" />
               <span className="hidden sm:inline">Editar</span>
@@ -86,7 +86,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                   onClose();
                   onQuickSell(watch);
                 }}
-                className="px-3 py-1.5 bg-[#4edea3] text-[#003824] hover:bg-[#3ecb93] font-bold text-xs rounded-lg transition-all flex items-center gap-1"
+                className="px-3 py-1.5 bg-[#4edea3] text-[#003824] hover:bg-[#3ecb93] font-bold text-xs rounded-lg transition-all flex items-center gap-1 cursor-pointer"
               >
                 <SellIcon className="w-4 h-4" />
                 <span>Registrar Venda</span>
@@ -103,7 +103,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
 
             <button
               onClick={onClose}
-              className="p-2 text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-full transition-colors ml-2"
+              className="p-2 text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-full transition-colors ml-2 cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>

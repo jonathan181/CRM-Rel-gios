@@ -6,7 +6,6 @@ let adminAuthInstance: any = null;
 try {
   let projectId = 'tuned-envoy-28gvj';
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const firebaseConfig = require('../../firebase-applet-config.json');
     if (firebaseConfig?.projectId) {
       projectId = firebaseConfig.projectId;

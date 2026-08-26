@@ -135,11 +135,16 @@ export async function getWatchesFromDb(userUid: string): Promise<Watch[]> {
 
     const { data, error } = await query;
 
-    if (!error && Array.isArray(data) && data.length > 0) {
+    if (error) {
+      console.warn('Warning fetching watches via Supabase client:', error);
+      return [];
+    }
+
+    if (Array.isArray(data)) {
       return data.map(mapRowToWatch);
     }
-  } catch (err) {
-    console.error('Error fetching watches via Supabase client:', err);
+  } catch (err: any) {
+    console.warn('Warning in getWatchesFromDb:', err);
   }
 
   return [];
@@ -151,39 +156,42 @@ export async function upsertWatchInDb(watch: Watch, userUid: string, userId?: nu
     return watch;
   }
 
-  try {
-    let resolvedUserId: number | null = userId || null;
-    let canonicalUid = userUid;
+  let resolvedUserId: number | null = userId || null;
+  let canonicalUid = userUid;
 
-    if (userUid || userId) {
-      let filterStr = `uid.eq.${userUid}`;
-      if (userId) filterStr += `,id.eq.${userId}`;
+  if (userUid || userId) {
+    let filterStr = `uid.eq.${userUid}`;
+    if (userId) filterStr += `,id.eq.${userId}`;
 
-      const { data: existingSbUser } = await supabaseClient
-        .from('users')
-        .select('id, uid')
-        .or(filterStr)
-        .maybeSingle();
+    const { data: existingSbUser } = await supabaseClient
+      .from('users')
+      .select('id, uid')
+      .or(filterStr)
+      .maybeSingle();
 
-      if (existingSbUser?.id) {
-        resolvedUserId = existingSbUser.id;
-        if (existingSbUser.uid) canonicalUid = existingSbUser.uid;
-      }
+    if (existingSbUser?.id) {
+      resolvedUserId = existingSbUser.id;
+      if (existingSbUser.uid) canonicalUid = existingSbUser.uid;
     }
+  }
 
-    const rowData = mapWatchToSupabaseRow(watch, canonicalUid, resolvedUserId);
-    const { error: sbErr } = await supabaseClient
-      .from('watches')
-      .upsert(rowData, { onConflict: 'id' });
+  const rowData = mapWatchToSupabaseRow(watch, canonicalUid, resolvedUserId);
+  const { error: sbErr } = await supabaseClient
+    .from('watches')
+    .upsert(rowData, { onConflict: 'id' });
 
-    if (sbErr && sbErr.code === 'PGRST204') {
+  if (sbErr) {
+    if (sbErr.code === 'PGRST204') {
       // Fallback if Supabase schema cache lacks optional columns
       delete rowData.shipment_date_brazil;
       delete rowData.arrival_date_brazil;
-      await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
+      const { error: retryErr } = await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
+      if (retryErr) {
+        console.warn('Retry upsert error:', retryErr);
+      }
+    } else {
+      console.warn('Upsert watch warning:', sbErr);
     }
-  } catch (err) {
-    console.warn('Error upserting watch via Supabase client:', err);
   }
 
   return watch;
@@ -191,27 +199,33 @@ export async function upsertWatchInDb(watch: Watch, userUid: string, userId?: nu
 
 export async function deleteWatchFromDb(watchId: string, userUid: string): Promise<void> {
   const supabaseClient = getSupabaseClient();
-  if (!supabaseClient) return;
+  if (!supabaseClient) {
+    return;
+  }
 
-  try {
-    await supabaseClient.from('watches').delete().eq('id', watchId);
-  } catch (err) {
-    console.error('Error deleting watch via Supabase client:', err);
+  const { error } = await supabaseClient.from('watches').delete().eq('id', watchId);
+  if (error) {
+    console.warn('Error deleting watch via Supabase client:', error);
   }
 }
 
 export async function replaceAllWatchesInDb(newWatches: Watch[], userUid: string, userId?: number): Promise<Watch[]> {
   const supabaseClient = getSupabaseClient();
-  if (!supabaseClient) return newWatches;
+  if (!supabaseClient) {
+    return newWatches;
+  }
 
-  try {
-    await supabaseClient.from('watches').delete().eq('user_uid', userUid);
-    for (const w of newWatches) {
-      const rowData = mapWatchToSupabaseRow(w, userUid, userId);
-      await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
+  const { error: delErr } = await supabaseClient.from('watches').delete().eq('user_uid', userUid);
+  if (delErr) {
+    console.warn('Error clearing watches via Supabase client:', delErr);
+  }
+
+  for (const w of newWatches) {
+    const rowData = mapWatchToSupabaseRow(w, userUid, userId);
+    const { error: insErr } = await supabaseClient.from('watches').upsert(rowData, { onConflict: 'id' });
+    if (insErr) {
+      console.warn('Error upserting watch in replaceAll:', insErr);
     }
-  } catch (err) {
-    console.error('Error replaceAllWatches via Supabase client:', err);
   }
 
   return newWatches;

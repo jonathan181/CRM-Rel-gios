@@ -558,7 +558,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                         <div className="flex items-center gap-1.5">
                           <button
                             onClick={() => onEditWatch(watch)}
-                            className="w-8 h-8 rounded-full bg-[#201f22] border border-[#27272a] flex items-center justify-center text-[#e5e1e4] hover:text-[#ffd165] hover:border-[#ffd165]/50 transition-colors"
+                            className="w-8 h-8 rounded-full bg-[#201f22] border border-[#27272a] flex items-center justify-center text-[#e5e1e4] hover:text-[#ffd165] hover:border-[#ffd165]/50 transition-colors cursor-pointer"
                             title="Editar relógio"
                           >
                             <Edit className="w-3.5 h-3.5" />
@@ -567,7 +567,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
                           {!isSold && (
                             <button
                               onClick={() => setSellWatch(watch)}
-                              className="w-8 h-8 rounded-full bg-[#003824] border border-[#4edea3]/30 flex items-center justify-center text-[#4edea3] hover:scale-105 transition-transform"
+                              className="w-8 h-8 rounded-full bg-[#003824] border border-[#4edea3]/30 flex items-center justify-center text-[#4edea3] hover:scale-105 transition-transform cursor-pointer"
                               title="Registrar Venda"
                             >
                               <DollarSign className="w-3.5 h-3.5" />

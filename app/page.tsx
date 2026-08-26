@@ -4,12 +4,18 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { safeFetchJson } from '@/lib/api';
 import { Watch, SaleDetails } from '@/types/watch';
 import { getWatches, saveWatches, resetToInitialWatches } from '@/lib/storage';
-import { INITIAL_WATCHES } from '@/lib/initialData';
+import { 
+  broadcastWatchSaved, 
+  broadcastWatchDeleted, 
+  broadcastWatchesSynced, 
+  subscribeToCrossTabSync 
+} from '@/lib/tabSync';
 import { Navbar } from '@/components/Navbar';
 import { InventoryView } from '@/components/InventoryView';
 import { TransactionForm } from '@/components/TransactionForm';
 import { FinancialAnalyticsView } from '@/components/FinancialAnalyticsView';
 import { ConfirmModal } from '@/components/ConfirmModal';
+import { ErrorModal } from '@/components/ErrorModal';
 import { LoginPage } from '@/components/LoginPage';
 import { useAuth } from '@/components/AuthProvider';
 
@@ -26,15 +32,23 @@ export default function Home() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Global Error Modal for persistent / sync failures
+  const [globalError, setGlobalError] = useState<{
+    title?: string;
+    message: string;
+    details?: string;
+    onRetry?: () => void;
+  } | null>(null);
+
   const { user, loading, getToken } = useAuth();
 
-  // Fetch watches from Cloud SQL when authenticated
-  const fetchCloudSqlWatches = useCallback(async () => {
+  // Fetch watches from PostgreSQL / Supabase when authenticated
+  const fetchCloudSqlWatches = useCallback(async (silent = false) => {
     if (!user) {
       setIsLoadingWatches(false);
       return;
     }
-    setIsSyncing(true);
+    if (!silent) setIsSyncing(true);
     try {
       const token = await getToken();
       if (!token) {
@@ -42,88 +56,201 @@ export default function Home() {
         return;
       }
       const res = await fetch('/api/watches', {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          'Accept': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
       });
       if (res.ok) {
-        const data = await safeFetchJson(res);
-        if (Array.isArray(data.watches)) {
-          setWatches(data.watches);
-          saveWatches(data.watches);
+        try {
+          const data = await safeFetchJson(res);
+          if (Array.isArray(data.watches)) {
+            setWatches(data.watches);
+            saveWatches(data.watches);
+            broadcastWatchesSynced(data.watches);
+          }
+        } catch {
+          // If server response is not JSON (e.g. static fallback), keep local stored watches
+          const localWatches = getWatches();
+          setWatches(localWatches);
         }
       }
-    } catch (e) {
-      console.error('Error fetching watches from Cloud SQL:', e);
+    } catch {
+      // Keep local cached watches on network / server fetch failures
+      const localWatches = getWatches();
+      setWatches(localWatches);
     } finally {
-      setIsSyncing(false);
+      if (!silent) setIsSyncing(false);
       setIsLoadingWatches(false);
     }
   }, [user, getToken]);
 
-  // Fetch from Cloud SQL on auth
+  // Initial fetch and focus / visibility change sync
   useEffect(() => {
+    let animFrame: number;
     if (user) {
-      const handle = requestAnimationFrame(() => {
+      animFrame = requestAnimationFrame(() => {
         fetchCloudSqlWatches();
       });
-      return () => cancelAnimationFrame(handle);
+
+      // When tab regains focus or visibility, refresh silently to keep multi-tab concurrency intact
+      const handleVisibilityChange = () => {
+        if (document.visibilityState === 'visible') {
+          fetchCloudSqlWatches(true);
+        }
+      };
+
+      const handleFocus = () => {
+        fetchCloudSqlWatches(true);
+      };
+
+      window.addEventListener('visibilitychange', handleVisibilityChange);
+      window.addEventListener('focus', handleFocus);
+
+      return () => {
+        cancelAnimationFrame(animFrame);
+        window.removeEventListener('visibilitychange', handleVisibilityChange);
+        window.removeEventListener('focus', handleFocus);
+      };
     } else {
-      const handle = requestAnimationFrame(() => {
+      animFrame = requestAnimationFrame(() => {
         setWatches([]);
+        setIsLoadingWatches(false);
       });
-      return () => cancelAnimationFrame(handle);
+      return () => cancelAnimationFrame(animFrame);
     }
   }, [user, fetchCloudSqlWatches]);
 
-  // Save watches helper (Local + Cloud SQL)
+  // Subscribe to real-time Cross-Tab synchronization (BroadcastChannel / storage event)
+  useEffect(() => {
+    const unsubscribe = subscribeToCrossTabSync((msg) => {
+      if (msg.type === 'WATCH_SAVED') {
+        setWatches((prev) => {
+          const exists = prev.some((w) => w.id === msg.watch.id);
+          const updated = exists
+            ? prev.map((w) => (w.id === msg.watch.id ? msg.watch : w))
+            : [msg.watch, ...prev];
+          saveWatches(updated);
+          return updated;
+        });
+      } else if (msg.type === 'WATCH_DELETED') {
+        setWatches((prev) => {
+          const updated = prev.filter((w) => w.id !== msg.watchId);
+          saveWatches(updated);
+          return updated;
+        });
+      } else if (msg.type === 'WATCHES_SYNCED') {
+        if (Array.isArray(msg.allWatches)) {
+          setWatches(msg.allWatches);
+          saveWatches(msg.allWatches);
+        }
+      }
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  // Save / Mutate watches helper with verified server persistence
   const updateWatchesState = async (
     newWatches: Watch[],
     watchToSave?: Watch,
     action?: 'save' | 'delete' | 'replace_all',
     deletedId?: string
-  ) => {
-    setWatches(newWatches);
-    saveWatches(newWatches);
+  ): Promise<boolean> => {
+    if (!user) {
+      setGlobalError({
+        title: 'Sessão Expirada',
+        message: 'Você precisa estar autenticado para persistir alterações no estoque.',
+      });
+      return false;
+    }
 
-    if (user) {
-      setIsSyncing(true);
-      try {
-        const token = await getToken();
-        if (token) {
-          if (action === 'delete' && deletedId) {
-            await fetch(`/api/watches?id=${encodeURIComponent(deletedId)}`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${token}` },
-            });
-          } else if (action === 'save' && watchToSave) {
-            await fetch('/api/watches', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ watch: watchToSave }),
-            });
-          } else {
-            await fetch('/api/watches', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ action: 'replace_all', watches: newWatches }),
-            });
-          }
-        }
-      } catch (e) {
-        console.error('Error syncing with Cloud SQL:', e);
-      } finally {
-        setIsSyncing(false);
+    setIsSyncing(true);
+    try {
+      const token = await getToken();
+      if (!token) {
+        throw new Error('Não foi possível obter a credencial de autenticação. Faça login novamente.');
       }
+
+      let res: Response;
+      if (action === 'delete' && deletedId) {
+        res = await fetch(`/api/watches?id=${encodeURIComponent(deletedId)}`, {
+          method: 'DELETE',
+          headers: {
+            'Accept': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+        });
+      } else if (action === 'save' && watchToSave) {
+        res = await fetch('/api/watches', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ watch: watchToSave }),
+        });
+      } else {
+        res = await fetch('/api/watches', {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ action: 'replace_all', watches: newWatches }),
+        });
+      }
+
+      if (!res.ok) {
+        const errJson = await safeFetchJson(res).catch(() => ({ error: `Falha no servidor (status ${res.status})` }));
+        throw new Error(errJson.error || `Erro de persistência no servidor (${res.status})`);
+      }
+
+      // If server confirmed persistence, update local state & broadcast to other open tabs
+      setWatches(newWatches);
+      saveWatches(newWatches);
+
+      if (action === 'save' && watchToSave) {
+        broadcastWatchSaved(watchToSave, newWatches);
+      } else if (action === 'delete' && deletedId) {
+        broadcastWatchDeleted(deletedId, newWatches);
+      } else {
+        broadcastWatchesSynced(newWatches);
+      }
+
+      return true;
+    } catch (e: any) {
+      console.error('Error persisting to database:', e);
+      const isNetworkError =
+        e?.name === 'TypeError' ||
+        e?.message?.includes('fetch') ||
+        e?.message?.includes('Failed to fetch') ||
+        e?.message?.includes('network');
+
+      const userMessage = isNetworkError
+        ? 'Falha de conexão com a internet. O servidor não respondeu e o relógio não pôde ser gravado.'
+        : e?.message || 'Ocorreu um erro inesperado ao gravar no banco de dados.';
+
+      setGlobalError({
+        title: 'Erro ao Gravar no Banco de Dados',
+        message: userMessage,
+        details: e?.stack || String(e),
+        onRetry: () => {
+          setGlobalError(null);
+          updateWatchesState(newWatches, watchToSave, action, deletedId);
+        },
+      });
+
+      return false;
+    } finally {
+      setIsSyncing(false);
     }
   };
 
   // Handlers
-  const handleSaveWatch = (savedWatch: Watch) => {
+  const handleSaveWatch = async (savedWatch: Watch): Promise<boolean> => {
     const exists = watches.some((w) => w.id === savedWatch.id);
     let updated: Watch[];
     if (exists) {
@@ -131,12 +258,17 @@ export default function Home() {
     } else {
       updated = [savedWatch, ...watches];
     }
-    updateWatchesState(updated, savedWatch, 'save');
-    setEditingWatch(null);
-    setActiveTab('estoque');
+
+    const success = await updateWatchesState(updated, savedWatch, 'save');
+    if (success) {
+      setEditingWatch(null);
+      setActiveTab('estoque');
+      return true;
+    }
+    return false;
   };
 
-  const handleConfirmSale = (watchId: string, saleData: SaleDetails) => {
+  const handleConfirmSale = async (watchId: string, saleData: SaleDetails): Promise<boolean> => {
     let updatedWatch: Watch | undefined;
     const updated = watches.map((w) => {
       if (w.id === watchId) {
@@ -150,12 +282,14 @@ export default function Home() {
       }
       return w;
     });
-    updateWatchesState(updated, updatedWatch, 'save');
+
+    if (!updatedWatch) return false;
+    return await updateWatchesState(updated, updatedWatch, 'save');
   };
 
-  const handleDeleteWatch = (watchId: string) => {
+  const handleDeleteWatch = async (watchId: string): Promise<boolean> => {
     const updated = watches.filter((w) => w.id !== watchId);
-    updateWatchesState(updated, undefined, 'delete', watchId);
+    return await updateWatchesState(updated, undefined, 'delete', watchId);
   };
 
   const handleEditWatch = (watch: Watch) => {
@@ -235,19 +369,32 @@ export default function Home() {
       <ConfirmModal
         isOpen={showResetConfirm}
         title="Zerar Estoque"
-        description="Deseja remover todos os relógios e zerar o estoque da sua conta?"
+        description="Deseja remover todos os relógios e zerar o estoque da sua conta no banco de dados?"
         confirmLabel="Zerar Estoque"
         cancelLabel="Cancelar"
         variant="warning"
-        onConfirm={() => {
-          updateWatchesState([], undefined, 'replace_all');
-          setEditingWatch(null);
-          setActiveTab('estoque');
-          setShowResetConfirm(false);
+        onConfirm={async () => {
+          const ok = await updateWatchesState([], undefined, 'replace_all');
+          if (ok) {
+            setEditingWatch(null);
+            setActiveTab('estoque');
+            setShowResetConfirm(false);
+          }
         }}
         onCancel={() => setShowResetConfirm(false)}
+      />
+
+      {/* Global Persistence / Concurrency Error Pop-up Modal */}
+      <ErrorModal
+        isOpen={globalError !== null}
+        title={globalError?.title || 'Erro ao Gravar no Banco de Dados'}
+        errorMessage={globalError?.message || 'Falha ao persistir alterações.'}
+        technicalDetails={globalError?.details}
+        onRetry={globalError?.onRetry}
+        onClose={() => setGlobalError(null)}
+        retryLabel="Tentar Novamente"
+        closeLabel="Fechar"
       />
     </div>
   );
 }
-

@@ -3,7 +3,9 @@
 import React, { useState, useEffect } from 'react';
 import { Watch, WatchStatus, CurrencyCode, SaleDetails } from '@/types/watch';
 import { formatCurrencyBrl } from '@/lib/storage';
+import { optimizeImageFile } from '@/lib/imageUtils';
 import { ImagePresetsModal } from './ImagePresetsModal';
+import { ErrorModal } from './ErrorModal';
 import { 
   Plus, 
   Upload, 
@@ -19,12 +21,13 @@ import {
   Watch as WatchIcon,
   HelpCircle,
   Image as ImageIcon,
-  AlertTriangle
+  AlertTriangle,
+  Loader2
 } from 'lucide-react';
 
 interface TransactionFormProps {
   initialWatch?: Watch | null;
-  onSave: (watch: Watch) => void;
+  onSave: (watch: Watch) => Promise<boolean | void> | void;
   onCancel?: () => void;
 }
 
@@ -111,6 +114,16 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
   const [newImageUrl, setNewImageUrl] = useState<string>('');
   const [showPresetsModal, setShowPresetsModal] = useState<boolean>(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isOptimizingImages, setIsOptimizingImages] = useState<boolean>(false);
+
+  // Persistence, Loading & Error state
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [saveError, setSaveError] = useState<{
+    title?: string;
+    message: string;
+    details?: string;
+    pendingWatch?: Watch;
+  } | null>(null);
 
   // Status & Sale Registration
   const [status, setStatus] = useState<WatchStatus>(initialWatch?.status || 'Em Estoque');
@@ -192,49 +205,39 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     setImageUrls(prev => prev.filter((_, idx) => idx !== index));
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
     setUploadError(null);
-    const oversizedFiles: { name: string; sizeMb: string }[] = [];
+    setIsOptimizingImages(true);
 
-    Array.from(files).forEach(file => {
-      if (file.size > 10 * 1024 * 1024) {
-        const sizeMb = (file.size / (1024 * 1024)).toFixed(1);
-        oversizedFiles.push({ name: file.name, sizeMb });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setImageUrls(prev => [...prev, event.target!.result as string]);
+    try {
+      const fileList = Array.from(files);
+      for (const file of fileList) {
+        if (file.size > 15 * 1024 * 1024) {
+          setUploadError(`A imagem "${file.name}" excede o limite máximo permitido de 15 MB por foto.`);
+          continue;
         }
-      };
-      reader.onerror = () => {
-        setUploadError(`Erro ao ler o arquivo "${file.name}". Por favor, tente novamente.`);
-      };
-      reader.readAsDataURL(file);
-    });
-
-    if (oversizedFiles.length > 0) {
-      if (oversizedFiles.length === 1) {
-        setUploadError(
-          `A imagem "${oversizedFiles[0].name}" possui ${oversizedFiles[0].sizeMb} MB, o que excede o limite máximo permitido de 10 MB por foto. O carregamento foi cancelado.`
-        );
-      } else {
-        const fileNames = oversizedFiles.map(f => `"${f.name}" (${f.sizeMb} MB)`).join(', ');
-        setUploadError(
-          `As imagens ${fileNames} excedem o limite máximo permitido de 10 MB por foto. O carregamento foi cancelado.`
-        );
+        try {
+          const optimizedDataUrl = await optimizeImageFile(file, 1600, 0.85);
+          if (optimizedDataUrl) {
+            setImageUrls(prev => [...prev, optimizedDataUrl]);
+          }
+        } catch (err: any) {
+          console.error('Error optimizing image:', err);
+          setUploadError(`Erro ao processar imagem "${file.name}". Tente novamente.`);
+        }
       }
+    } finally {
+      setIsOptimizingImages(false);
+      e.target.value = '';
     }
-
-    e.target.value = '';
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSaving) return;
 
     const brand = (selectedBrand === 'Outro' || selectedBrand === 'Outra Marca...') ? customBrand.trim() : selectedBrand;
     if (!brand) {
@@ -301,7 +304,30 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       updatedAt: new Date().toISOString()
     };
 
-    onSave(watchData);
+    setIsSaving(true);
+    setSaveError(null);
+
+    try {
+      const result = await onSave(watchData);
+      if (result === false) {
+        // Error was triggered by onSave handler
+        setSaveError({
+          title: 'Erro ao Gravar no Banco de Dados',
+          message: 'Não foi possível confirmar a gravação do relógio no servidor. Seus dados continuam no formulário.',
+          pendingWatch: watchData
+        });
+      }
+    } catch (err: any) {
+      console.error('Error saving watch:', err);
+      setSaveError({
+        title: 'Erro ao Gravar no Banco de Dados',
+        message: err?.message || 'Falha de conexão com o banco de dados ao salvar o relógio.',
+        details: err?.stack || String(err),
+        pendingWatch: watchData
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -993,24 +1019,45 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         </div>
 
         {/* Submit Bar */}
-        <div className="pt-2 flex justify-end gap-3">
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-6 py-3 text-xs font-bold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors cursor-pointer"
-            >
-              Cancelar
-            </button>
+        <div className="pt-2 flex flex-col sm:flex-row justify-between items-center gap-3">
+          {isOptimizingImages && (
+            <div className="flex items-center gap-2 text-xs text-[#ffd165] animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>Otimizando imagens em alta resolução...</span>
+            </div>
           )}
+          {!isOptimizingImages && <div />}
 
-          <button
-            type="submit"
-            className="px-8 py-3.5 bg-[#ffd165] text-[#131315] font-bold text-sm rounded-xl hover:bg-[#f7be1d] transition-all shadow-xl flex items-center gap-2 cursor-pointer"
-          >
-            <Check className="w-4 h-4" />
-            <span>{initialWatch ? 'Atualizar Registro' : 'Salvar Registro'}</span>
-          </button>
+          <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            {onCancel && (
+              <button
+                type="button"
+                onClick={onCancel}
+                disabled={isSaving}
+                className="px-6 py-3 text-xs font-bold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors cursor-pointer disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+            )}
+
+            <button
+              type="submit"
+              disabled={isSaving || isOptimizingImages}
+              className="w-full sm:w-auto px-8 py-3.5 bg-[#ffd165] text-[#131315] font-bold text-sm rounded-xl hover:bg-[#f7be1d] transition-all shadow-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Gravando no Banco de Dados...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{initialWatch ? 'Atualizar Registro' : 'Salvar Registro'}</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </form>
 
@@ -1021,6 +1068,21 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           onClose={() => setShowPresetsModal(false)}
         />
       )}
+
+      {/* Database Persistence / Connection Error Pop-up Modal */}
+      <ErrorModal
+        isOpen={saveError !== null}
+        title={saveError?.title || 'Erro ao Gravar no Banco de Dados'}
+        errorMessage={saveError?.message || 'Ocorreu um erro ao persistir o relógio.'}
+        technicalDetails={saveError?.details}
+        onRetry={() => {
+          setSaveError(null);
+          handleSubmit();
+        }}
+        onClose={() => setSaveError(null)}
+        retryLabel="Tentar Gravar Novamente"
+        closeLabel="Fechar e Revisar Dados"
+      />
     </div>
   );
 };

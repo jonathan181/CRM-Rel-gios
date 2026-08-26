@@ -3,12 +3,12 @@
 import React, { useState } from 'react';
 import { Watch, SaleDetails } from '@/types/watch';
 import { formatCurrencyBrl } from '@/lib/storage';
-import { X, DollarSign, Calendar, User, Phone, FileText } from 'lucide-react';
+import { X, DollarSign, Calendar, User, Phone, FileText, Loader2 } from 'lucide-react';
 
 interface QuickSellModalProps {
   watch: Watch | null;
   onClose: () => void;
-  onConfirmSale: (watchId: string, saleData: SaleDetails) => void;
+  onConfirmSale: (watchId: string, saleData: SaleDetails) => Promise<boolean | void> | void;
 }
 
 export const QuickSellModal: React.FC<QuickSellModalProps> = ({
@@ -24,14 +24,17 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
   const [buyerName, setBuyerName] = useState<string>('');
   const [buyerContact, setBuyerContact] = useState<string>('');
   const [notes, setNotes] = useState<string>('');
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   if (!watch) return null;
 
   const netProfit = salePriceBrl - watch.totalCostBrl - shippingAndFeesBrl;
   const marginPercent = salePriceBrl > 0 ? ((netProfit / salePriceBrl) * 100) : 0;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     if (!salePriceBrl || salePriceBrl <= 0) {
       alert('Informe um preço de venda válido.');
       return;
@@ -41,16 +44,22 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
       return;
     }
 
-    onConfirmSale(watch.id, {
-      salePriceBrl,
-      saleDate,
-      shippingAndFeesBrl,
-      buyerName,
-      buyerContact,
-      notes
-    });
-
-    onClose();
+    setIsSubmitting(true);
+    try {
+      const res = await onConfirmSale(watch.id, {
+        salePriceBrl,
+        saleDate,
+        shippingAndFeesBrl,
+        buyerName,
+        buyerContact,
+        notes
+      });
+      if (res !== false) {
+        onClose();
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -68,7 +77,7 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-full transition-colors"
+            className="p-1.5 text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-full transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
@@ -213,15 +222,24 @@ export const QuickSellModal: React.FC<QuickSellModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-semibold text-[#9b8f79] hover:text-[#e5e1e4] hover:bg-[#27272a] rounded-xl transition-colors cursor-pointer disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="px-5 py-2.5 bg-[#ffd165] text-[#131315] font-bold text-xs rounded-xl hover:bg-[#f7be1d] transition-colors shadow-lg"
+              disabled={isSubmitting}
+              className="px-5 py-2.5 bg-[#ffd165] text-[#131315] font-bold text-xs rounded-xl hover:bg-[#f7be1d] transition-colors shadow-lg cursor-pointer flex items-center gap-2 disabled:opacity-75 disabled:cursor-not-allowed"
             >
-              Confirmar Venda
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  <span>Gravando Venda...</span>
+                </>
+              ) : (
+                <span>Confirmar Venda</span>
+              )}
             </button>
           </div>
         </form>

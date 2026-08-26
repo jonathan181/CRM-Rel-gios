@@ -94,6 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               await fetch('/api/users/sync', {
                 method: 'POST',
                 headers: {
+                  'Accept': 'application/json',
                   'Content-Type': 'application/json',
                   Authorization: `Bearer ${token}`,
                 },
@@ -102,7 +103,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }),
               });
             } catch (e) {
-              console.error('Error auto-syncing user:', e);
+              console.warn('Auto-sync notice:', e);
             }
           } else {
             const localAuth = localStorage.getItem(AUTH_STORAGE_KEY);
@@ -181,6 +182,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ name, email, password }),
@@ -211,6 +213,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: {
+          'Accept': 'application/json',
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ email, password }),
