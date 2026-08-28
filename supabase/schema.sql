@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS public.watches (
   buyer_name TEXT,
   buyer_contact TEXT,
   sale_notes TEXT,
+  shipment_date_brazil TEXT,
+  arrival_date_brazil TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

@@ -172,10 +172,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         setStatus('Em Trânsito');
       }
     } else {
-      setNotArrivedYet(false);
-      if (status === 'Em Trânsito') {
-        setStatus('Em Estoque');
-      }
+      setNotSentYet(false);
     }
   };
 
@@ -188,7 +185,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
         setStatus('Em Trânsito');
       }
     } else {
-      if (!notSentYet && status === 'Em Trânsito') {
+      setNotArrivedYet(false);
+      if (arrivalDateBrazil && status !== 'Vendido' && status !== 'Consignação' && status !== 'Coleção') {
         setStatus('Em Estoque');
       }
     }
@@ -273,9 +271,20 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       };
     }
 
+    // Clean and determine effective dates
+    const effectiveShipmentDate = (!notSentYet && shipmentDateBrazil.trim()) ? shipmentDateBrazil.trim() : undefined;
+    const effectiveArrivalDate = (!notArrivedYet && !notSentYet && arrivalDateBrazil.trim()) ? arrivalDateBrazil.trim() : (arrivalDateBrazil.trim() || undefined);
+
     let finalStatus = status;
-    if ((notSentYet || notArrivedYet) && finalStatus !== 'Vendido' && finalStatus !== 'Consignação') {
-      finalStatus = 'Em Trânsito';
+    if (effectiveArrivalDate) {
+      // If arrival date exists and watch isn't Vendido/Consignação/Coleção, auto-promote to Em Estoque
+      if (finalStatus !== 'Vendido' && finalStatus !== 'Consignação' && finalStatus !== 'Coleção') {
+        finalStatus = 'Em Estoque';
+      }
+    } else if (notSentYet || notArrivedYet || (effectiveShipmentDate && !effectiveArrivalDate)) {
+      if (finalStatus !== 'Vendido' && finalStatus !== 'Consignação' && finalStatus !== 'Coleção') {
+        finalStatus = 'Em Trânsito';
+      }
     }
 
     const watchData: Watch = {
@@ -286,8 +295,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
       serialNumber: serialNumber.trim(),
       condition,
       purchaseDate,
-      shipmentDateBrazil: notSentYet ? undefined : (shipmentDateBrazil || undefined),
-      arrivalDateBrazil: (notArrivedYet || notSentYet) ? undefined : (arrivalDateBrazil || undefined),
+      shipmentDateBrazil: effectiveShipmentDate,
+      arrivalDateBrazil: effectiveArrivalDate,
       purchaseCurrency,
       purchasePrice,
       freightCost,
@@ -471,13 +480,23 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               </label>
               <input
                 type="date"
-                disabled={notSentYet}
                 value={shipmentDateBrazil}
                 onChange={(e) => {
-                  setShipmentDateBrazil(e.target.value);
-                  if (e.target.value) setNotSentYet(false);
+                  const val = e.target.value;
+                  setShipmentDateBrazil(val);
+                  if (val) {
+                    setNotSentYet(false);
+                    if (!arrivalDateBrazil && status === 'Em Estoque') {
+                      setStatus('Em Trânsito');
+                    }
+                  }
                 }}
-                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                onFocus={() => {
+                  if (notSentYet) setNotSentYet(false);
+                }}
+                className={`w-full px-3.5 py-2 bg-[#131315] border focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none transition-all ${
+                  notSentYet ? 'border-dashed border-[#27272a] opacity-70' : 'border-[#27272a]'
+                }`}
               />
               <div>
                 <button
@@ -497,32 +516,47 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
             {/* Data de chegada no Brasil */}
             <div className="space-y-1.5">
-              <label className="block text-xs font-semibold text-[#e5e1e4]">
-                Data de chegada no Brasil
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-[#e5e1e4]">
+                  Data de chegada no Brasil
+                </label>
+                {arrivalDateBrazil && status === 'Em Estoque' && (
+                  <span className="text-[10px] text-[#4edea3] font-semibold flex items-center gap-1">
+                    ✓ Status: Em Estoque
+                  </span>
+                )}
+              </div>
               <input
                 type="date"
-                disabled={notArrivedYet || notSentYet}
                 value={arrivalDateBrazil}
                 onChange={(e) => {
-                  setArrivalDateBrazil(e.target.value);
-                  if (e.target.value) {
+                  const val = e.target.value;
+                  setArrivalDateBrazil(val);
+                  if (val) {
                     setNotArrivedYet(false);
                     setNotSentYet(false);
+                    if (status !== 'Vendido' && status !== 'Consignação' && status !== 'Coleção') {
+                      setStatus('Em Estoque');
+                    }
                   }
                 }}
-                className="w-full px-3.5 py-2 bg-[#131315] border border-[#27272a] focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+                onFocus={() => {
+                  if (notArrivedYet) setNotArrivedYet(false);
+                  if (notSentYet) setNotSentYet(false);
+                }}
+                className={`w-full px-3.5 py-2 bg-[#131315] border focus:border-[#ffd165] rounded-xl text-xs text-[#e5e1e4] outline-none transition-all ${
+                  notArrivedYet || notSentYet ? 'border-dashed border-[#27272a] opacity-70' : 'border-[#27272a]'
+                }`}
               />
               <div>
                 <button
                   type="button"
-                  disabled={notSentYet}
                   onClick={handleToggleNotArrivedYet}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
                     notArrivedYet || notSentYet
                       ? 'bg-blue-500/20 text-blue-300 border-blue-500/50 shadow-sm'
                       : 'bg-[#131315] text-[#9b8f79] border-[#27272a] hover:text-[#e5e1e4] hover:border-[#353437]'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                  }`}
                 >
                   <span className={`w-2 h-2 rounded-full ${notArrivedYet || notSentYet ? 'bg-blue-400 animate-pulse' : 'bg-gray-500'}`} />
                   <span>Ainda não chegou</span>
@@ -848,7 +882,7 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
             </h3>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
             <button
               type="button"
               onClick={() => {
@@ -884,7 +918,11 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
 
             <button
               type="button"
-              onClick={() => setStatus('Consignação')}
+              onClick={() => {
+                setStatus('Consignação');
+                setNotSentYet(false);
+                setNotArrivedYet(false);
+              }}
               className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
                 status === 'Consignação'
                   ? 'bg-purple-600 text-white border-purple-600 shadow-lg scale-[1.02]'
@@ -892,6 +930,22 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
               }`}
             >
               Consignação
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setStatus('Coleção');
+                setNotSentYet(false);
+                setNotArrivedYet(false);
+              }}
+              className={`py-3 px-3 rounded-xl font-bold text-xs transition-all border cursor-pointer ${
+                status === 'Coleção'
+                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-lg scale-[1.02]'
+                  : 'bg-[#131315] text-[#e5e1e4] border-[#27272a] hover:border-indigo-500/50'
+              }`}
+            >
+              Coleção
             </button>
 
             <button
@@ -991,31 +1045,43 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
           )}
 
           {/* Resumo Financeiro Preview */}
-          <div className="p-4 bg-[#201f22] rounded-xl border border-[#27272a] flex justify-between items-center">
-            <div>
-              <span className="text-xs text-[#9b8f79] block">
-                {status === 'Vendido' ? 'Lucro Líquido Realizado' : 'Margem Estimada de Lucro'}
-              </span>
-              <span
-                className={`font-mono font-bold text-lg ${
-                  computedNetProfit >= 0 ? 'text-[#4edea3]' : 'text-red-400'
-                }`}
-              >
-                {formatCurrencyBrl(computedNetProfit)}
+          {status === 'Coleção' ? (
+            <div className="p-4 bg-indigo-950/40 rounded-xl border border-indigo-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div>
+                <span className="text-xs text-indigo-300 block font-semibold">Status: Coleção Própria</span>
+                <span className="text-xs text-[#e5e1e4]/80">Relógio mantido para acervo pessoal (não impacta faturamento e análise financeira de vendas).</span>
+              </div>
+              <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded-lg text-xs font-bold font-mono flex-shrink-0">
+                Acervo Pessoal
               </span>
             </div>
+          ) : (
+            <div className="p-4 bg-[#201f22] rounded-xl border border-[#27272a] flex justify-between items-center">
+              <div>
+                <span className="text-xs text-[#9b8f79] block">
+                  {status === 'Vendido' ? 'Lucro Líquido Realizado' : 'Margem Estimada de Lucro'}
+                </span>
+                <span
+                  className={`font-mono font-bold text-lg ${
+                    computedNetProfit >= 0 ? 'text-[#4edea3]' : 'text-red-400'
+                  }`}
+                >
+                  {formatCurrencyBrl(computedNetProfit)}
+                </span>
+              </div>
 
-            <div className="text-right">
-              <span className="text-xs text-[#9b8f79] block">Margem %</span>
-              <span
-                className={`font-mono font-bold text-base ${
-                  computedMarginPercent >= 0 ? 'text-[#4edea3]' : 'text-red-400'
-                }`}
-              >
-                {computedMarginPercent.toFixed(1)}%
-              </span>
+              <div className="text-right">
+                <span className="text-xs text-[#9b8f79] block">Margem %</span>
+                <span
+                  className={`font-mono font-bold text-base ${
+                    computedMarginPercent >= 0 ? 'text-[#4edea3]' : 'text-red-400'
+                  }`}
+                >
+                  {computedMarginPercent.toFixed(1)}%
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* Submit Bar */}

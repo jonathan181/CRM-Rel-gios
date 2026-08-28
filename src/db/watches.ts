@@ -97,10 +97,9 @@ function mapWatchToSupabaseRow(watch: Watch, userUid: string, userId?: number | 
     buyer_contact: watch.sale?.buyerContact ?? null,
     sale_notes: watch.sale?.notes ?? null,
     updated_at: new Date().toISOString(),
+    shipment_date_brazil: watch.shipmentDateBrazil || null,
+    arrival_date_brazil: watch.arrivalDateBrazil || null,
   };
-
-  if (watch.shipmentDateBrazil) row.shipment_date_brazil = watch.shipmentDateBrazil;
-  if (watch.arrivalDateBrazil) row.arrival_date_brazil = watch.arrivalDateBrazil;
 
   return row;
 }

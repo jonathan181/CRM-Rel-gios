@@ -31,6 +31,7 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
 
   const isSold = watch.status === 'Vendido';
   const isConsignment = watch.status === 'Consignação';
+  const isCollection = watch.status === 'Coleção' || (watch.status || '').toLowerCase() === 'coleção' || (watch.status || '').toLowerCase() === 'colecao';
   const isInTransit = watch.status === 'Em Trânsito';
 
   const salePriceBrl = watch.sale?.salePriceBrl || 0;
@@ -58,6 +59,8 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                   ? 'bg-[#4edea3]/10 text-[#4edea3] border-[#4edea3]/30'
                   : isConsignment
                   ? 'bg-purple-500/10 text-purple-400 border-purple-500/30'
+                  : isCollection
+                  ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/30'
                   : isInTransit
                   ? 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                   : 'bg-[#ffd165]/10 text-[#ffd165] border-[#ffd165]/30'
@@ -274,7 +277,24 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                 </div>
 
                 {/* Market Price or Sale Result */}
-                {!isSold ? (
+                {isCollection ? (
+                  <div className="pt-3 border-t border-[#27272a] flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <div>
+                      <span className="text-xs text-indigo-300 font-semibold block">Coleção Própria</span>
+                      <p className="text-xs text-[#e5e1e4]/75">
+                        Relógio do seu acervo particular — isento da análise financeira de giro e vendas.
+                      </p>
+                    </div>
+                    {watch.marketPriceBrl ? (
+                      <div className="text-right">
+                        <span className="text-xs text-[#9b8f79]">Valor de Mercado</span>
+                        <p className="font-mono font-bold text-sm text-[#ffd165]">
+                          {formatCurrencyBrl(watch.marketPriceBrl)}
+                        </p>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : !isSold ? (
                   <div className="pt-3 border-t border-[#27272a] flex justify-between items-center">
                     <div>
                       <span className="text-xs text-[#9b8f79]">Preço Estimado de Mercado</span>

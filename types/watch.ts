@@ -1,4 +1,4 @@
-export type WatchStatus = 'Em Estoque' | 'Em Trânsito' | 'Consignação' | 'Vendido';
+export type WatchStatus = 'Em Estoque' | 'Em Trânsito' | 'Consignação' | 'Coleção' | 'Vendido';
 
 export type CurrencyCode = 'BRL' | 'CNY' | 'USD' | 'EUR';
 
