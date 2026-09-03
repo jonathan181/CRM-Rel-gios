@@ -275,17 +275,8 @@ export const TransactionForm: React.FC<TransactionFormProps> = ({
     const effectiveShipmentDate = (!notSentYet && shipmentDateBrazil.trim()) ? shipmentDateBrazil.trim() : undefined;
     const effectiveArrivalDate = (!notArrivedYet && !notSentYet && arrivalDateBrazil.trim()) ? arrivalDateBrazil.trim() : (arrivalDateBrazil.trim() || undefined);
 
-    let finalStatus = status;
-    if (effectiveArrivalDate) {
-      // If arrival date exists and watch isn't Vendido/Consignação/Coleção, auto-promote to Em Estoque
-      if (finalStatus !== 'Vendido' && finalStatus !== 'Consignação' && finalStatus !== 'Coleção') {
-        finalStatus = 'Em Estoque';
-      }
-    } else if (notSentYet || notArrivedYet || (effectiveShipmentDate && !effectiveArrivalDate)) {
-      if (finalStatus !== 'Vendido' && finalStatus !== 'Consignação' && finalStatus !== 'Coleção') {
-        finalStatus = 'Em Trânsito';
-      }
-    }
+    // Strictly respect the user's manual selection in Section 4
+    const finalStatus = status;
 
     const watchData: Watch = {
       id: initialWatch?.id || `w-${Date.now()}`,

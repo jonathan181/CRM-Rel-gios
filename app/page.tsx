@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { safeFetchJson } from '@/lib/api';
-import { Watch, SaleDetails } from '@/types/watch';
+import { Watch, WatchStatus, SaleDetails } from '@/types/watch';
 import { getWatches, saveWatches, resetToInitialWatches } from '@/lib/storage';
 import { 
   broadcastWatchSaved, 
@@ -32,6 +32,9 @@ export default function Home() {
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
+  // Prevent background refetches from overwriting active in-flight mutations
+  const isMutatingRef = useRef(false);
+
   // Global Error Modal for persistent / sync failures
   const [globalError, setGlobalError] = useState<{
     title?: string;
@@ -44,8 +47,8 @@ export default function Home() {
 
   // Fetch watches from PostgreSQL / Supabase when authenticated
   const fetchCloudSqlWatches = useCallback(async (silent = false) => {
-    if (!user) {
-      setIsLoadingWatches(false);
+    if (!user || isMutatingRef.current) {
+      if (!user) setIsLoadingWatches(false);
       return;
     }
     if (!silent) setIsSyncing(true);
@@ -64,7 +67,7 @@ export default function Home() {
       if (res.ok) {
         try {
           const data = await safeFetchJson(res);
-          if (Array.isArray(data.watches)) {
+          if (Array.isArray(data.watches) && !isMutatingRef.current) {
             setWatches(data.watches);
             saveWatches(data.watches);
             broadcastWatchesSynced(data.watches);
@@ -150,7 +153,7 @@ export default function Home() {
     return () => unsubscribe();
   }, []);
 
-  // Save / Mutate watches helper with verified server persistence
+  // Save / Mutate watches helper with instant Optimistic Updates and verified server persistence
   const updateWatchesState = async (
     newWatches: Watch[],
     watchToSave?: Watch,
@@ -163,6 +166,21 @@ export default function Home() {
         message: 'Você precisa estar autenticado para persistir alterações no estoque.',
       });
       return false;
+    }
+
+    isMutatingRef.current = true;
+    const previousWatches = watches;
+
+    // 1. INSTANT OPTIMISTIC UPDATE: Update React State, LocalStorage & Broadcast IMMEDIATELY (0ms latency)
+    setWatches(newWatches);
+    saveWatches(newWatches);
+
+    if (action === 'save' && watchToSave) {
+      broadcastWatchSaved(watchToSave, newWatches);
+    } else if (action === 'delete' && deletedId) {
+      broadcastWatchDeleted(deletedId, newWatches);
+    } else {
+      broadcastWatchesSynced(newWatches);
     }
 
     setIsSyncing(true);
@@ -208,21 +226,14 @@ export default function Home() {
         throw new Error(errJson.error || `Erro de persistência no servidor (${res.status})`);
       }
 
-      // If server confirmed persistence, update local state & broadcast to other open tabs
-      setWatches(newWatches);
-      saveWatches(newWatches);
-
-      if (action === 'save' && watchToSave) {
-        broadcastWatchSaved(watchToSave, newWatches);
-      } else if (action === 'delete' && deletedId) {
-        broadcastWatchDeleted(deletedId, newWatches);
-      } else {
-        broadcastWatchesSynced(newWatches);
-      }
-
       return true;
     } catch (e: any) {
       console.error('Error persisting to database:', e);
+      // Rollback to previous state on server error
+      setWatches(previousWatches);
+      saveWatches(previousWatches);
+      broadcastWatchesSynced(previousWatches);
+
       const isNetworkError =
         e?.name === 'TypeError' ||
         e?.message?.includes('fetch') ||
@@ -230,8 +241,8 @@ export default function Home() {
         e?.message?.includes('network');
 
       const userMessage = isNetworkError
-        ? 'Falha de conexão com a internet. O servidor não respondeu e o relógio não pôde ser gravado.'
-        : e?.message || 'Ocorreu um erro inesperado ao gravar no banco de dados.';
+        ? 'Falha de conexão com o banco de dados. A alteração foi revertida.'
+        : e?.message || 'Ocorreu um erro ao gravar no banco de dados.';
 
       setGlobalError({
         title: 'Erro ao Gravar no Banco de Dados',
@@ -246,6 +257,7 @@ export default function Home() {
       return false;
     } finally {
       setIsSyncing(false);
+      isMutatingRef.current = false;
     }
   };
 
@@ -259,13 +271,26 @@ export default function Home() {
       updated = [savedWatch, ...watches];
     }
 
-    const success = await updateWatchesState(updated, savedWatch, 'save');
-    if (success) {
-      setEditingWatch(null);
-      setActiveTab('estoque');
-      return true;
+    setEditingWatch(null);
+    setActiveTab('estoque');
+    return await updateWatchesState(updated, savedWatch, 'save');
+  };
+
+  const handleUpdateWatchStatus = async (watch: Watch, newStatus: WatchStatus): Promise<boolean> => {
+    let sale = watch.sale;
+    if (newStatus !== 'Vendido') {
+      sale = undefined;
     }
-    return false;
+
+    const updatedWatch: Watch = {
+      ...watch,
+      status: newStatus,
+      sale,
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updated = watches.map((w) => (w.id === watch.id ? updatedWatch : w));
+    return await updateWatchesState(updated, updatedWatch, 'save');
   };
 
   const handleConfirmSale = async (watchId: string, saleData: SaleDetails): Promise<boolean> => {
@@ -347,6 +372,7 @@ export default function Home() {
             onConfirmSale={handleConfirmSale}
             onDeleteWatch={handleDeleteWatch}
             onAddNewClick={handleAddNewClick}
+            onUpdateWatchStatus={handleUpdateWatchStatus}
           />
         )}
 

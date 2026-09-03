@@ -177,11 +177,14 @@ export const Navbar: React.FC<NavbarProps> = ({
 
       {/* Top App Bar (Mobile & Tablet Header) */}
       <header className="lg:pl-[280px] flex justify-between items-center px-4 md:px-8 h-16 fixed top-0 left-0 right-0 z-30 bg-[#131315]/90 backdrop-blur-md border-b border-[#27272a]">
-        <div className="flex items-center gap-3">
-          <div className="lg:hidden flex items-center gap-2">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="lg:hidden flex items-center gap-2 flex-shrink-0">
             <Watch className="w-5 h-5 text-[#ffd165]" />
           </div>
-          <h2 className="font-bold text-base md:text-lg text-[#ffd165] tracking-tight">
+          <h2
+            id="page-active-tab-title"
+            className="font-bold text-sm sm:text-base md:text-lg text-[#ffd165] tracking-tight ml-2 sm:ml-3 md:ml-4 lg:ml-8 truncate"
+          >
             {activeTab === 'estoque' && 'Controle de Estoque e Vendas'}
             {activeTab === 'registrar' && 'Lançamento de Transação'}
             {activeTab === 'analise' && 'Análise Financeira'}

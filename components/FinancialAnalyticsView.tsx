@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { Watch, PeriodFilter } from '@/types/watch';
-import { calculateInventoryStats, formatCurrencyBrl } from '@/lib/storage';
+import { calculateInventoryStats, formatCurrencyBrl, formatDatePtBr } from '@/lib/storage';
 import { 
   ResponsiveContainer, 
   ComposedChart, 
@@ -27,7 +27,11 @@ import {
   Calendar,
   Layers,
   PieChart as PieIcon,
-  Plane
+  Plane,
+  ShoppingBag,
+  Tag,
+  Search,
+  ArrowUpRight
 } from 'lucide-react';
 
 interface FinancialAnalyticsViewProps {
@@ -642,6 +646,255 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
               </div>
             </div>
           </div>
+        </div>
+
+        {/* NOVA SEÇÃO: Listagem dos Relógios Já Vendidos */}
+        <div className="lg:col-span-12 glass-card p-6 rounded-2xl shadow-lg border border-[#27272a] space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#27272a]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[#4edea3]/10 border border-[#4edea3]/20 flex items-center justify-center text-[#4edea3] flex-shrink-0">
+                <ShoppingBag className="w-5 h-5" />
+              </div>
+              <div>
+                <h4 className="text-base font-bold text-[#e5e1e4] flex items-center gap-2">
+                  Relógios Vendidos
+                  <span className="px-2 py-0.5 text-[11px] font-mono font-bold bg-[#ffd165]/10 text-[#ffd165] border border-[#ffd165]/20 rounded-full">
+                    {filteredSoldWatches.length} {filteredSoldWatches.length === 1 ? 'unidade' : 'unidades'}
+                  </span>
+                </h4>
+                <p className="text-xs text-[#9b8f79] mt-0.5">
+                  Demonstrativo financeiro individual de custo, venda, lucro líquido e margem de cada peça.
+                </p>
+              </div>
+            </div>
+
+            <button
+              onClick={handleExportCsv}
+              disabled={filteredSoldWatches.length === 0}
+              className="px-3.5 py-1.5 bg-[#201f22] hover:bg-[#27272a] border border-[#27272a] hover:border-[#ffd165]/40 text-[#ffd165] font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 self-start sm:self-auto disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Exportar CSV</span>
+            </button>
+          </div>
+
+          {filteredSoldWatches.length === 0 ? (
+            <div className="p-8 text-center bg-[#18181b]/50 rounded-xl border border-[#27272a] space-y-2">
+              <ShoppingBag className="w-8 h-8 text-[#9b8f79] mx-auto opacity-50" />
+              <p className="text-sm font-semibold text-[#e5e1e4]">Nenhum relógio vendido no período selecionado</p>
+              <p className="text-xs text-[#9b8f79]">
+                Selecione outro período no topo ou registre novas vendas para visualizar o desempenho.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Tabela para Telas Médias e Grandes (Desktop / Tablet) */}
+              <div className="hidden md:block overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="text-[11px] uppercase tracking-wider text-[#9b8f79] border-b border-[#27272a] pb-2">
+                      <th className="pb-3 font-bold pl-1">Relógio</th>
+                      <th className="pb-3 font-bold text-center">Data Venda</th>
+                      <th className="pb-3 font-bold text-right">Custo Total</th>
+                      <th className="pb-3 font-bold text-right">Valor Venda</th>
+                      <th className="pb-3 font-bold text-right">Lucro Líquido</th>
+                      <th className="pb-3 font-bold text-right pr-2">Margem</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[#27272a]/60">
+                    {filteredSoldWatches.map((watch) => {
+                      const sale = watch.sale!;
+                      const fees = sale.shippingAndFeesBrl || 0;
+                      const netRevenue = sale.salePriceBrl - fees;
+                      const netProfit = netRevenue - watch.totalCostBrl;
+                      const marginPercent = sale.salePriceBrl > 0 ? (netProfit / sale.salePriceBrl) * 100 : 0;
+                      const isProfitable = netProfit >= 0;
+
+                      const primaryImage =
+                        (watch.images && watch.images.length > 0 && watch.images[0]) ||
+                        '/no-image.svg';
+
+                      return (
+                        <tr key={watch.id} className="hover:bg-[#201f22]/60 transition-colors group">
+                          {/* Foto + Nome + Ref */}
+                          <td className="py-3.5 pl-1">
+                            <div className="flex items-center gap-3">
+                              <div className="relative w-12 h-12 rounded-xl overflow-hidden bg-[#09090b] border border-[#27272a] flex-shrink-0">
+                                <img
+                                  src={primaryImage}
+                                  alt={`${watch.brand} ${watch.model}`}
+                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                                  onError={(e) => {
+                                    (e.target as HTMLImageElement).src = '/no-image.svg';
+                                  }}
+                                />
+                              </div>
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-sm font-bold text-[#e5e1e4] truncate group-hover:text-[#ffd165] transition-colors">
+                                  {watch.brand} {watch.model}
+                                </span>
+                                <div className="flex items-center gap-2 text-xs text-[#9b8f79] mt-0.5">
+                                  {watch.ref && <span>Ref: {watch.ref}</span>}
+                                  {sale.buyerName && (
+                                    <>
+                                      <span>•</span>
+                                      <span className="truncate">Cliente: {sale.buyerName}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Data de Venda */}
+                          <td className="py-3.5 text-center text-xs font-mono text-[#d4d4d8]">
+                            {formatDatePtBr(sale.saleDate)}
+                          </td>
+
+                          {/* Custo Total */}
+                          <td className="py-3.5 text-right text-xs font-mono text-[#d4d4d8]">
+                            {formatCurrencyBrl(watch.totalCostBrl)}
+                          </td>
+
+                          {/* Valor de Venda */}
+                          <td className="py-3.5 text-right font-mono">
+                            <div className="text-xs font-bold text-[#e5e1e4]">
+                              {formatCurrencyBrl(sale.salePriceBrl)}
+                            </div>
+                            {fees > 0 && (
+                              <div className="text-[10px] text-[#9b8f79]">
+                                Taxas: -{formatCurrencyBrl(fees)}
+                              </div>
+                            )}
+                          </td>
+
+                          {/* Lucro Líquido */}
+                          <td className="py-3.5 text-right font-mono">
+                            <span
+                              className={`text-xs font-bold px-2 py-0.5 rounded-lg inline-block ${
+                                isProfitable
+                                  ? 'text-[#4edea3] bg-[#4edea3]/10 border border-[#4edea3]/20'
+                                  : 'text-[#f87171] bg-[#f87171]/10 border border-[#f87171]/20'
+                              }`}
+                            >
+                              {isProfitable ? '+' : ''}
+                              {formatCurrencyBrl(netProfit)}
+                            </span>
+                          </td>
+
+                          {/* Margem % */}
+                          <td className="py-3.5 text-right pr-2 font-mono">
+                            <span
+                              className={`text-xs font-bold ${
+                                marginPercent >= 20
+                                  ? 'text-[#4edea3]'
+                                  : marginPercent >= 0
+                                  ? 'text-[#ffd165]'
+                                  : 'text-[#f87171]'
+                              }`}
+                            >
+                              {marginPercent >= 0 ? '+' : ''}
+                              {marginPercent.toFixed(1)}%
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Cards para Telas Pequenas (Mobile) */}
+              <div className="block md:hidden space-y-3">
+                {filteredSoldWatches.map((watch) => {
+                  const sale = watch.sale!;
+                  const fees = sale.shippingAndFeesBrl || 0;
+                  const netRevenue = sale.salePriceBrl - fees;
+                  const netProfit = netRevenue - watch.totalCostBrl;
+                  const marginPercent = sale.salePriceBrl > 0 ? (netProfit / sale.salePriceBrl) * 100 : 0;
+                  const isProfitable = netProfit >= 0;
+
+                  const primaryImage =
+                    (watch.images && watch.images.length > 0 && watch.images[0]) ||
+                    '/no-image.svg';
+
+                  return (
+                    <div
+                      key={watch.id}
+                      className="p-3.5 bg-[#18181b] border border-[#27272a] rounded-xl space-y-3 shadow-sm"
+                    >
+                      {/* Top: Foto e Nome */}
+                      <div className="flex items-center gap-3">
+                        <div className="relative w-12 h-12 rounded-lg overflow-hidden bg-[#09090b] border border-[#27272a] flex-shrink-0">
+                          <img
+                            src={primaryImage}
+                            alt={`${watch.brand} ${watch.model}`}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              (e.target as HTMLImageElement).src = '/no-image.svg';
+                            }}
+                          />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h5 className="text-xs font-bold text-[#e5e1e4] truncate">
+                            {watch.brand} {watch.model}
+                          </h5>
+                          <p className="text-[11px] text-[#9b8f79] truncate">
+                            {watch.ref ? `Ref: ${watch.ref} • ` : ''}Vendido em {formatDatePtBr(sale.saleDate)}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* 2x2 Grid de Métricas Financeiras */}
+                      <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#27272a] text-xs">
+                        <div className="bg-[#131315] p-2 rounded-lg">
+                          <span className="text-[10px] uppercase font-bold text-[#9b8f79] block">Custo</span>
+                          <span className="font-mono text-[#d4d4d8] font-semibold">
+                            {formatCurrencyBrl(watch.totalCostBrl)}
+                          </span>
+                        </div>
+
+                        <div className="bg-[#131315] p-2 rounded-lg">
+                          <span className="text-[10px] uppercase font-bold text-[#9b8f79] block">Valor Venda</span>
+                          <span className="font-mono text-[#ffd165] font-semibold">
+                            {formatCurrencyBrl(sale.salePriceBrl)}
+                          </span>
+                        </div>
+
+                        <div className="bg-[#131315] p-2 rounded-lg">
+                          <span className="text-[10px] uppercase font-bold text-[#9b8f79] block">Lucro Líquido</span>
+                          <span
+                            className={`font-mono font-bold ${
+                              isProfitable ? 'text-[#4edea3]' : 'text-[#f87171]'
+                            }`}
+                          >
+                            {isProfitable ? '+' : ''}
+                            {formatCurrencyBrl(netProfit)}
+                          </span>
+                        </div>
+
+                        <div className="bg-[#131315] p-2 rounded-lg">
+                          <span className="text-[10px] uppercase font-bold text-[#9b8f79] block">Margem</span>
+                          <span
+                            className={`font-mono font-bold ${
+                              marginPercent >= 20
+                                ? 'text-[#4edea3]'
+                                : marginPercent >= 0
+                                ? 'text-[#ffd165]'
+                                : 'text-[#f87171]'
+                            }`}
+                          >
+                            {marginPercent >= 0 ? '+' : ''}
+                            {marginPercent.toFixed(1)}%
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

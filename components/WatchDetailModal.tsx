@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Watch } from '@/types/watch';
+import { Watch, WatchStatus } from '@/types/watch';
 import { formatCurrencyBrl, formatDatePtBr, formatCurrencyUsd } from '@/lib/storage';
 import { ConfirmModal } from './ConfirmModal';
-import { X, Calendar, DollarSign, Tag, User, MapPin, FileText, ExternalLink, Copy, Check, Edit, Trash2, DollarSign as SellIcon, ShieldCheck } from 'lucide-react';
+import { X, Calendar, DollarSign, Tag, User, MapPin, FileText, ExternalLink, Copy, Check, Edit, Trash2, DollarSign as SellIcon, ShieldCheck, CheckCircle2 } from 'lucide-react';
 
 interface WatchDetailModalProps {
   watch: Watch | null;
@@ -12,6 +12,7 @@ interface WatchDetailModalProps {
   onEdit: (watch: Watch) => void;
   onQuickSell: (watch: Watch) => void;
   onDelete: (id: string) => void;
+  onUpdateStatus?: (watch: Watch, newStatus: WatchStatus) => Promise<boolean | void> | void;
 }
 
 export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
@@ -19,11 +20,13 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
   onClose,
   onEdit,
   onQuickSell,
-  onDelete
+  onDelete,
+  onUpdateStatus
 }) => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [copiedUrl, setCopiedUrl] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
 
   if (!watch) return null;
 
@@ -44,6 +47,22 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
       navigator.clipboard.writeText(activeImage);
       setCopiedUrl(true);
       setTimeout(() => setCopiedUrl(false), 2000);
+    }
+  };
+
+  const handleStatusChange = async (newStatus: WatchStatus) => {
+    if (newStatus === watch.status) return;
+    if (newStatus === 'Vendido') {
+      onQuickSell(watch);
+      return;
+    }
+    if (onUpdateStatus) {
+      setIsUpdatingStatus(true);
+      try {
+        await onUpdateStatus(watch, newStatus);
+      } finally {
+        setIsUpdatingStatus(false);
+      }
     }
   };
 
@@ -228,6 +247,49 @@ export const WatchDetailModal: React.FC<WatchDetailModalProps> = ({
                     </p>
                   </div>
                 )}
+              </div>
+
+              {/* Interactive Status Changer */}
+              <div className="p-4 bg-[#131315] rounded-xl border border-[#27272a] space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[#ffd165]">
+                    Status do Relógio
+                  </span>
+                  {isUpdatingStatus && (
+                    <span className="text-[11px] text-[#ffd165] font-semibold animate-pulse">
+                      Atualizando status...
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                  {(['Em Estoque', 'Em Trânsito', 'Consignação', 'Coleção', 'Vendido'] as WatchStatus[]).map((st) => {
+                    const isSelected = watch.status === st;
+                    return (
+                      <button
+                        key={st}
+                        type="button"
+                        disabled={isUpdatingStatus}
+                        onClick={() => handleStatusChange(st)}
+                        className={`py-2 px-2 rounded-lg text-xs font-bold transition-all border text-center cursor-pointer disabled:opacity-50 ${
+                          isSelected
+                            ? st === 'Em Estoque'
+                              ? 'bg-[#ffd165] text-[#131315] border-[#ffd165] shadow-md'
+                              : st === 'Em Trânsito'
+                              ? 'bg-blue-500 text-white border-blue-500 shadow-md'
+                              : st === 'Consignação'
+                              ? 'bg-purple-600 text-white border-purple-600 shadow-md'
+                              : st === 'Coleção'
+                              ? 'bg-indigo-600 text-white border-indigo-600 shadow-md'
+                              : 'bg-[#4edea3] text-[#003824] border-[#4edea3] shadow-md'
+                            : 'bg-[#201f22] text-[#e5e1e4] border-[#27272a] hover:border-[#ffd165]/50'
+                        }`}
+                      >
+                        {st}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Financial Box */}

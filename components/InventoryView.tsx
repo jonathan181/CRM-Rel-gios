@@ -32,6 +32,7 @@ interface InventoryViewProps {
   onConfirmSale: (watchId: string, saleData: any) => void;
   onDeleteWatch: (watchId: string) => void;
   onAddNewClick: () => void;
+  onUpdateWatchStatus?: (watch: Watch, newStatus: WatchStatus) => Promise<boolean | void> | void;
 }
 
 export const InventoryView: React.FC<InventoryViewProps> = ({
@@ -41,7 +42,8 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
   onEditWatch,
   onConfirmSale,
   onDeleteWatch,
-  onAddNewClick
+  onAddNewClick,
+  onUpdateWatchStatus
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('Todos');
@@ -752,7 +754,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
       {/* Detail Modal */}
       {detailWatch && (
         <WatchDetailModal
-          watch={detailWatch}
+          watch={watches.find((w) => w.id === detailWatch.id) || detailWatch}
           onClose={() => setDetailWatch(null)}
           onEdit={(w) => {
             setDetailWatch(null);
@@ -766,6 +768,7 @@ export const InventoryView: React.FC<InventoryViewProps> = ({
             onDeleteWatch(id);
             setDetailWatch(null);
           }}
+          onUpdateStatus={onUpdateWatchStatus}
         />
       )}
 
