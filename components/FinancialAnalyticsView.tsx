@@ -172,19 +172,19 @@ export const FinancialAnalyticsView: React.FC<FinancialAnalyticsViewProps> = ({ 
       averageHoldingDays = Math.round(totalDays / filteredSoldWatches.length);
     }
 
-    // Calculation for Brazil arrival to final sale
+    // Calculation for Brazil arrival to final sale (Data de Chegada no Brasil -> Data da Venda)
     let averageBrazilHoldingDays: number | null = null;
     let brazilCount = 0;
-    const watchesWithBrazilDate = filteredSoldWatches.filter(w => w.shipmentDateBrazil && w.sale?.saleDate);
-    if (watchesWithBrazilDate.length > 0) {
-      const totalBrazilDays = watchesWithBrazilDate.reduce((acc, w) => {
-        const bDate = new Date(w.shipmentDateBrazil!.length === 10 ? `${w.shipmentDateBrazil}T00:00:00` : w.shipmentDateBrazil!);
+    const watchesWithArrivalDate = filteredSoldWatches.filter(w => w.arrivalDateBrazil && w.sale?.saleDate);
+    if (watchesWithArrivalDate.length > 0) {
+      const totalBrazilDays = watchesWithArrivalDate.reduce((acc, w) => {
+        const bDate = new Date(w.arrivalDateBrazil!.length === 10 ? `${w.arrivalDateBrazil}T00:00:00` : w.arrivalDateBrazil!);
         const sDate = new Date(w.sale!.saleDate.length === 10 ? `${w.sale!.saleDate}T00:00:00` : w.sale!.saleDate);
         const diffTime = sDate.getTime() - bDate.getTime();
         const diffDays = Math.max(0, Math.floor(diffTime / (1000 * 60 * 60 * 24)));
         return acc + diffDays;
       }, 0);
-      brazilCount = watchesWithBrazilDate.length;
+      brazilCount = watchesWithArrivalDate.length;
       averageBrazilHoldingDays = Math.round(totalBrazilDays / brazilCount);
     }
 

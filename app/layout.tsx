@@ -1,6 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { AuthProvider } from '@/components/AuthProvider';
+import { Analytics } from '@vercel/analytics/react';
 
 export const metadata: Metadata = {
   title: 'Horological Precision - Gestão de Estoque e Vendas de Relógios',
@@ -23,6 +24,7 @@ export default function RootLayout({children}: {children: React.ReactNode}) {
         <AuthProvider>
           {children}
         </AuthProvider>
+        <Analytics />
       </body>
     </html>
   );
